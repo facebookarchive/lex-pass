@@ -1,0 +1,39 @@
+lex-pass allows you to automate changes to a php codebase, by writing
+abstract-syntax-tree transformers in haskell.  haskell is good because it is
+well-suited for language manipulation and because it has good parsing libraries
+that enable us to work with a nice abstract-syntax-tree.
+
+to install
+- ./install
+depends on
+- futil (git://github.com/facebook/futil.git)
+
+to use
+- run `lex-pass` to see options
+- to see an example run, run `lex-pass example-glolbal` with a codebase in
+  ~/www that uses some globals (e.g. "global $a;")
+  - note a large codebase could takes tens of minutes the first run because no
+    ast's are cached yet
+  - you can ^C it early after it does 'Saving' on a few files to see how the
+    changes work
+- to write a new transformer
+  - see src/Transf/ for examples
+  - src/codegen (which is run by ./install) automatically detects new
+    transformers in src/Transf/
+- if you are using git you may want to use a separate repo instead of just a
+  branch in an existing repo.  files have mtime updated by branch-switching,
+  so there will be some unnecessary re-parsing.
+
+to get help
+- lex-pass@lists.facebook.com
+
+notes for those hacking on lex-pass itself
+- todo
+  - maintain cached asts for codebase somewhere so ppl don't have to wait on
+    their first lex-pass run?
+  - better error on one-arg transf's if args wrong?
+  - better way to specify args in transf doc?
+  - make showing full transf list an option instead of default help?
+  - we might actually get better perf with our own lexer, or at least not
+    restarting php over and over again to do lexing.  but not worth looking
+    into any time soon?
