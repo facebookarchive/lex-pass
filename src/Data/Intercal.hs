@@ -1,6 +1,7 @@
 module Data.Intercal where
 
 import Control.Arrow
+import Control.Applicative
 import Control.Monad hiding (mapM)
 import Data.Binary
 import Data.Tok
@@ -82,7 +83,7 @@ map :: (a -> c) -> (b -> d) -> Intercal a b -> Intercal c d
 map f _g (Interend x) = Interend (f x)
 map f  g (Intercal x y rest) = Intercal (f x) (g y) (map f g rest)
 
-mapM :: (Monad m) => (a -> m c) -> (b -> m d) -> Intercal a b ->
+mapA :: (Applicative m) => (a -> m c) -> (b -> m d) -> Intercal a b ->
   m (Intercal c d)
-mapM f _g (Interend x) = liftM Interend (f x)
-mapM f  g (Intercal x y rest) = liftM3 Intercal (f x) (g y) (mapM f g rest)
+mapA f _g (Interend x) = liftA Interend (f x)
+mapA f  g (Intercal x y rest) = liftA3 Intercal (f x) (g y) (mapA f g rest)

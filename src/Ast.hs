@@ -86,6 +86,15 @@ data VarMbVal = VarMbVal Var (Maybe (WS, WS, Expr))
 data VarVal a = VarVal a WS WS Expr
   deriving (Eq, Show)
 
+class ModExprs a where
+  modExprs :: (Expr -> ([String], Maybe Expr)) -> a -> State (Bool, [String]) a
+
+{-
+instance ModExprs Stmt where
+  modExprs f (StmtBlock) =
+  modExprs f x = x
+-}
+
 data Stmt =
   StmtBlock     (Block Stmt)                  |
   StmtBreak     (Maybe (WS, Expr)) WS StmtEnd |
@@ -95,7 +104,6 @@ data Stmt =
   StmtDoWhile   WS BlockOrStmt WS WS WS Expr WS WS StmtEnd |
   -- this list must have at least one element.. should i make a type for that?
   StmtEcho      Bool [WSCap Expr] StmtEnd     |
-  -- allowing any Expr to have "static" is over-general but we don't care
   StmtExpr      Expr WS StmtEnd               |
   StmtFor       WS ForPart ForPart ForPart WS BlockOrStmt |
   StmtForeach   WS WS Expr WS WS DubArrowMb WS WS BlockOrStmt |

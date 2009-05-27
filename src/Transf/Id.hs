@@ -1,8 +1,8 @@
 module Transf.Id where
 
 import Ast
+import Control.Applicative
 import Control.Arrow
-import Control.Monad.State
 import Data.Tok
 import FUtil
 import LexPassUtil
@@ -18,6 +18,10 @@ transfs = [
   -=- argless (lexPass $ changeNothing False)
   ]
 
--- pretend we changed something to make this file count and force write
-changeNothing :: Bool -> StmtList -> State (Bool, [String]) StmtList
-changeNothing mod stmt = modify (first $ const mod) >> return stmt
+-- optionally pretend we changed something to make this file count and force
+-- rewrite.
+changeNothing :: Bool -> StmtList -> Transformed StmtList
+changeNothing pretendMod stmtList =
+  if pretendMod
+    then pure stmtList
+    else transfNothing

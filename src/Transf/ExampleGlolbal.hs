@@ -1,7 +1,7 @@
 module Transf.ExampleGlolbal where
 
 import Ast
-import Control.Monad.State
+import Control.Applicative
 import Data.List
 import Data.Tok
 import FUtil
@@ -16,12 +16,11 @@ transfs = [
   -=- argless (lexPass lol)
   ]
 
-addLolsBeforeGlobals :: WS -> Stmt -> WS -> ([String], Maybe StmtList)
-addLolsBeforeGlobals wsPre stmt@(StmtGlobal vars StmtEndSemi) wsPost =
-  (,) [] . Just .
+addLolsBeforeGlobals :: WS -> Stmt -> WS -> Transformed StmtList
+addLolsBeforeGlobals wsPre stmt@(StmtGlobal vars StmtEndSemi) wsPost = pure .
   IC.Intercal (wsPre ++ [commentTokOf "/* lol */"] ++ lastLine wsPre) stmt $
   IC.Interend wsPost
-addLolsBeforeGlobals _ _ _ = ([], Nothing)
+addLolsBeforeGlobals _ _ _ = transfNothing
 
-lol :: StmtList -> State (Bool, [String]) StmtList
-lol = IC.concatMapM $ allStmts addLolsBeforeGlobals
+lol :: StmtList -> Transformed StmtList
+lol = modAllStmts addLolsBeforeGlobals

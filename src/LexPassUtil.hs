@@ -27,6 +27,21 @@ data Transf = Transf {
     CanErrStrIO (Bool, [String])
   }
 
+data Transformed a = Transformed {
+  infoLines :: [String],
+  transfResult :: Maybe a
+  } deriving (Show)
+
+instance Functor Transformed where
+  fmap f t = t {transfResult = fmap f $ transfResult t}
+
+instance Applicative Transformed where
+  pure x = Transformed {infoLines = [], transfResult = Just x}
+  -- needed? (sensible?) or should we just have Pointed / use own pure
+  f <*> t = Transformed {
+    infoLines    = infoLines f ++ infoLines t,
+    transfResult = transfResult f <*> transfResult t}
+
 (-?-) :: String -> String -> (String, String)
 name -?- doc = (name, doc)
 
@@ -44,24 +59,28 @@ argless :: (t -> t1 -> t2) -> [a] -> t -> t1 -> t2
 argless f args dir subPath = if null args then f dir subPath
   else error "Expected no arguments."
 
-lexPass :: (StmtList -> State (Bool, [String]) StmtList) ->
+lexPass :: (StmtList -> Transformed StmtList) ->
   FilePath -> FilePath -> Int -> Int -> CanErrStrIO (Bool, [String])
 lexPass transf codeDir subPath total cur = do
   io . hPutStrLn stderr $ "Checking (" ++ show cur ++ "/" ++ show total ++
     ") " ++ subPath
   ast <- io $ parseAndCache codeDir subPath
-  case runState (transf ast) (False, []) of
-    (_,    (False, res)) -> return (False, res)
-    (ast', (True,  res)) -> do
+  case transf ast of
+    Transformed {infoLines = infoLines, transfResult = Nothing} ->
+      return (False, infoLines)
+    Transformed {infoLines = infoLines, transfResult = Just ast'} -> do
       io $ hPutStrLn stderr "- Saving"
       io . writeFile (codeDir </> subPath) . concat . map tokGetVal $
         toToks ast'
       io $ encodeFile (astPath codeDir subPath) ast'
-      return (True, res)
+      return (True, infoLines)
 
 --
 -- basic transf-building tools
 --
+
+transfNothing :: Transformed a
+transfNothing = Transformed {infoLines = [], transfResult = Nothing}
 
 lastIndent :: WS -> (WS, WS)
 lastIndent [] = ([], [])
@@ -85,66 +104,107 @@ lastLine ws = case lastIndent ws of
 wsSp :: [Tok]
 wsSp = [wsTokOf " "]
 
+{-
+class ModAllAble a where
+  modAll :: (WS -> a -> WS -> ([String], Maybe (IC.Intercal WS a))) ->
+             WS -> a -> WS -> State (Bool, [String]) (IC.Intercal WS a)
+-}
+
+modIntercal :: (a -> b -> a -> Transformed (IC.Intercal a b)) ->
+  IC.Intercal a b -> Transformed (IC.Intercal a b)
+modIntercal f ical = case runState (IC.concatMapM f' ical) ([], False) of
+  (res, (infoLines, True)) ->
+    Transformed {infoLines = infoLines, transfResult = Just res}
+  (_, (infoLines, False)) ->
+    Transformed {infoLines = infoLines, transfResult = Nothing}
+  where
+  f' a1 b a2 = case f a1 b a2 of
+    Transformed {infoLines = infoLines, transfResult = Just res} ->
+      withState (\ (i, _) -> (i ++ infoLines, True)) $ return res
+    Transformed {infoLines = infoLines, transfResult = Nothing} ->
+      withState (first (++ infoLines)) . return .
+      IC.Intercal a1 b $ IC.Interend a2
+
 -- ignores single-statemnt if/etc blocks currently
 -- FIXME: switch contents are ignored currently
 --        might reconcile StmtList type there before implementing
-allStmts :: (WS -> Stmt -> WS -> ([String], Maybe StmtList)) ->
-             WS -> Stmt -> WS -> State (Bool, [String]) StmtList
-allStmts f wsPre stmt wsPost = case f wsPre stmt wsPost of
-  (res, Just stmtMod) -> withState (const (True, res)) $ return stmtMod
-  (res, Nothing)      -> withState (second (++ res)) $ case stmt of
-    -- todo: class
-    {-
-    StmtClass x -> single .
-      StmtClass $ x {classBlock = doBlock $ classBlock x}
-    -}
-    StmtFuncDef x -> do
-      block' <- doBlock $ funcBlock x
-      return . single . StmtFuncDef $ x {funcBlock = block'}
+modAllStmts :: (WS -> Stmt -> WS -> Transformed StmtList) ->
+  StmtList -> Transformed StmtList
+modAllStmts f = modIntercal $ \ wsPre s wsPost -> case f wsPre s wsPost of
+  t@(Transformed {transfResult = Just _}) -> t
+  _ -> case s of
+    --StmtDoWhile ws1
+    StmtFuncDef x ->
+      (\ block' -> single . StmtFuncDef $ x {funcBlock = block'}) <$>
+        doBlock (funcBlock x)
     -- todo: named params to kill much boilerplate here?
-    StmtFor ws1 inits conds incrs ws2 (Right block) -> do
-      block' <- doBlock $ block
-      return . single . StmtFor ws1 inits conds incrs ws2 $ Right block'
-    StmtForeach ws1 ws2 expr ws3 ws4 dubArrow ws5 ws6 (Right block) -> do
-      block' <- doBlock $ block
-      return . single .  StmtForeach ws1 ws2 expr ws3 ws4 dubArrow ws5 ws6 $
-        Right block'
-    StmtIf ifAndIfelses theElse -> single <$> liftM2 StmtIf
-      (IC.mapM ifery return ifAndIfelses) (elsery theElse)
+    StmtFor ws1 inits conds incrs ws2 (Right block) ->
+      (single . StmtFor ws1 inits conds incrs ws2 . Right) <$> doBlock block
+    StmtForeach ws1 ws2 expr ws3 ws4 dubArrow ws5 ws6 (Right block) ->
+      (single . StmtForeach ws1 ws2 expr ws3 ws4 dubArrow ws5 ws6 . Right) <$>
+      doBlock block
+    StmtIf ifAndIfelses theElse -> single <$> liftA2 StmtIf
+      (IC.mapA ifery pure ifAndIfelses) (elsery theElse)
       where
-      ifery (ws1, ws2, expr, ws3, ws4, Right block) = do
-        block' <- doBlock block
-        return (ws1, ws2, expr, ws3, ws4, Right block')
-      ifery other = return other
-      elsery (Just (ws1, ws2, Right block)) = do
-        block' <- doBlock block
-        return $ Just (ws1, ws2, Right block')
-      elsery other = return other
+      ifery (ws1, ws2, expr, ws3, ws4, Right block) =
+        (\ block' -> (ws1, ws2, expr, ws3, ws4, Right block')) <$>
+        doBlock block
+      ifery other = pure other
+      elsery (Just (ws1, ws2, Right block)) =
+        (\ block' -> Just (ws1, ws2, Right block')) <$> doBlock block
+      elsery other = pure other
     {-
     StmtSwitch ws1 ws2 expr ws3 ws4 cases defaultCase ->
       StmtSwitch ws1 ws2 expr ws3 ws4 () ()
     -}
-    _ -> return $ single stmt
-  where
-  single :: Stmt -> StmtList
-  single stmt1 = singleStmt wsPre stmt1 wsPost
+    _ -> transfNothing
+    where
+    single :: Stmt -> StmtList
+    single stmt1 = singleStmt wsPre stmt1 wsPost
 
-  doBlock :: Block Stmt -> State (Bool, [String]) (Block Stmt)
-  doBlock (Block stmtList) = Block <$> doStmtList stmtList
-
-  doStmtList :: StmtList -> State (Bool, [String]) StmtList
-  doStmtList = IC.concatMapM $ allStmts f
+    doBlock :: Block Stmt -> Transformed (Block Stmt)
+    doBlock (Block stmtList) = Block <$> modAllStmts f stmtList
 
 singleStmt :: WS -> Stmt -> WS -> StmtList
 singleStmt wsPre stmt wsPost = IC.Intercal wsPre stmt $ IC.Interend wsPost
 
 {-
-allFuncs :: (WS -> Stmt -> WS -> Maybe StmtList) ->
-             WS -> Stmt -> WS -> StmtList
-allFuncs f wsPre func wsPost = case f wsPre func wsPost of
-  Just funcRepl -> funcRepl
-  Nothing       -> case
+instance ModAllAble Expr where
+  modAll f wsPre x wsPost = modAll
+
+  case f wsPre func wsPost of
+    Just funcRepl -> xMod
+    Nothing       -> case
 -}
+
+{-
+modAllExprs ::
+  (Expr -> ([String], Maybe Expr)) ->
+   WS -> Stmt -> WS -> State (Bool, [String]) StmtList
+modAllExprs f wsPre stmt wsPost = modAllStmts f' wsPre stmt wsPost where
+  f' = case stmt of
+    StmtBreak mbWsExpr ws stmtEnd ->
+      StmtBreak (second fDo <$> mbWsExpr) ws stmtEnd
+    _ -> Nothing
+-}
+
+{-
+stmtDoExprs ::
+  (Expr -> ([String], Maybe Expr)) ->
+   Stmt -> ([String], Maybe Stmt)
+stmtDoExprs f = case Stmt of
+-}
+
+{-
+changeIfViewsChange ::
+  (a -> ([String], Maybe a)) ->
+  [b -> (a, a -> b)] ->
+  (b -> ([String], Maybe b)
+stmtChangeIfAnyChange f viewers =
+  map viewers
+-}
+
+
 
 --
 -- behind-the-scenes/lower-level stuff
@@ -152,7 +212,7 @@ allFuncs f wsPre func wsPost = case f wsPre func wsPost of
 --
 
 tokParseKillPos :: String -> Tok
-tokParseKillPos l = Tok (head ps) (nlUnesc $ last ps) where
+tokParseKillPos l = Tok (head ps) . nlUnesc $ last ps where
   ps = breaksN (== '\t') 3 l
 
 tokUnparseFakePos :: Tok -> String
