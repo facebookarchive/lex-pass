@@ -137,25 +137,23 @@ modAllStmts f = modIntercal $ \ wsPre s wsPost -> case f wsPre s wsPost of
     StmtFuncDef x ->
       (\ block' -> single . StmtFuncDef $ x {funcBlock = block'}) <$>
         doBlock (funcBlock x)
-    -- todo: named params to kill much boilerplate here?
-    StmtFor ws1 inits conds incrs ws2 (Right block) ->
-      (single . StmtFor ws1 inits conds incrs ws2 . Right) <$> doBlock block
-    StmtForeach ws1 ws2 expr ws3 ws4 dubArrow ws5 ws6 (Right block) ->
-      (single . StmtForeach ws1 ws2 expr ws3 ws4 dubArrow ws5 ws6 . Right) <$>
-      doBlock block
-    StmtIf ifAndIfelses theElse -> single <$> liftA2 StmtIf
+    StmtFor (x@(For {forBlock = Right block})) -> single . StmtFor .
+      (\ block' -> x {forBlock = Right block'}) <$> doBlock block
+    StmtForeach (x@Foreach {foreachBlock = Right block}) -> single .
+      StmtForeach .
+      (\ block' -> x {foreachBlock = Right block'}) <$> doBlock block
+    StmtIf (If ifAndIfelses theElse) -> single . StmtIf <$> liftA2 If
       (IC.mapA ifery pure ifAndIfelses) (elsery theElse)
       where
-      ifery (ws1, ws2, expr, ws3, ws4, Right block) =
-        (\ block' -> (ws1, ws2, expr, ws3, ws4, Right block')) <$>
-        doBlock block
+      ifery (x@(IfBlock {ifBlockBlock = Right block})) =
+        (\ block' -> x {ifBlockBlock = Right block'}) <$> doBlock block
       ifery other = pure other
       elsery (Just (ws1, ws2, Right block)) =
         (\ block' -> Just (ws1, ws2, Right block')) <$> doBlock block
       elsery other = pure other
     {-
     StmtSwitch ws1 ws2 expr ws3 ws4 cases defaultCase ->
-      StmtSwitch ws1 ws2 expr ws3 ws4 () ()
+     StmtSwitch ws1 ws2 expr ws3 ws4 () ()
     -}
     _ -> transfNothing
     where
