@@ -87,3 +87,9 @@ mapA :: (Applicative m) => (a -> m c) -> (b -> m d) -> Intercal a b ->
   m (Intercal c d)
 mapA f _g (Interend x) = liftA Interend (f x)
 mapA f  g (Intercal x y rest) = liftA3 Intercal (f x) (g y) (mapA f g rest)
+
+-- this is a singleton "in b" and you would just use Interend if you wanted a
+-- singleton "in a"
+singleton :: a -> b -> a -> Intercal a b
+singleton a1 b a2 = Intercal a1 b $ Interend a2
+

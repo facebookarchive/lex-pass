@@ -125,24 +125,37 @@ modIntercal f ical = case runState (IC.concatMapM f' ical) ([], False) of
       withState (first (++ infoLines)) . return .
       IC.Intercal a1 b $ IC.Interend a2
 
--- ignores single-statemnt if/etc blocks currently
--- FIXME: switch contents are ignored currently
---        might reconcile StmtList type there before implementing
+modMap :: (a -> Transformed a) -> [a] -> Transformed [a]
+modMap f xs = case runState (mapM f' xs) ([], False) of
+  (res, (infoLines, True)) ->
+    Transformed {infoLines = infoLines, transfResult = Just res}
+  (_, (infoLines, False)) ->
+    Transformed {infoLines = infoLines, transfResult = Nothing}
+  where
+  f' x = case f x of
+    Transformed {infoLines = infoLines, transfResult = Just res} ->
+      withState (\ (i, _) -> (i ++ infoLines, True)) $ return res
+    Transformed {infoLines = infoLines, transfResult = Nothing} ->
+      withState (first (++ infoLines)) $ return x
+
+-- ignores single-statement if/etc blocks currently
+-- (we _could_ convert them out of single-statement-ness on change)
 modAllStmts :: (WS -> Stmt -> WS -> Transformed StmtList) ->
   StmtList -> Transformed StmtList
 modAllStmts f = modIntercal $ \ wsPre s wsPost -> case f wsPre s wsPost of
   t@(Transformed {transfResult = Just _}) -> t
-  _ -> case s of
-    --StmtDoWhile ws1
+  _ -> (\ stmt' -> IC.singleton wsPre stmt' wsPost) <$> case s of
+    StmtDoWhile (x@DoWhile {doWhileBlock = Right block}) ->
+      (\ block' -> StmtDoWhile $ x {doWhileBlock = Right block'}) <$>
+      doBlock block
     StmtFuncDef x ->
-      (\ block' -> single . StmtFuncDef $ x {funcBlock = block'}) <$>
+      (\ block' -> StmtFuncDef $ x {funcBlock = block'}) <$>
         doBlock (funcBlock x)
-    StmtFor (x@(For {forBlock = Right block})) -> single . StmtFor .
+    StmtFor (x@(For {forBlock = Right block})) -> StmtFor .
       (\ block' -> x {forBlock = Right block'}) <$> doBlock block
-    StmtForeach (x@Foreach {foreachBlock = Right block}) -> single .
-      StmtForeach .
+    StmtForeach (x@Foreach {foreachBlock = Right block}) -> StmtForeach .
       (\ block' -> x {foreachBlock = Right block'}) <$> doBlock block
-    StmtIf (If ifAndIfelses theElse) -> single . StmtIf <$> liftA2 If
+    StmtIf (If ifAndIfelses theElse) -> StmtIf <$> liftA2 If
       (IC.mapA ifery pure ifAndIfelses) (elsery theElse)
       where
       ifery (x@(IfBlock {ifBlockBlock = Right block})) =
@@ -151,20 +164,13 @@ modAllStmts f = modIntercal $ \ wsPre s wsPost -> case f wsPre s wsPost of
       elsery (Just (ws1, ws2, Right block)) =
         (\ block' -> Just (ws1, ws2, Right block')) <$> doBlock block
       elsery other = pure other
-    {-
-    StmtSwitch ws1 ws2 expr ws3 ws4 cases defaultCase ->
-     StmtSwitch ws1 ws2 expr ws3 ws4 () ()
-    -}
+    StmtSwitch x -> StmtSwitch . (\ cases' -> x {switchCases = cases'}) <$>
+      modMap doCase (switchCases x)
     _ -> transfNothing
     where
-    single :: Stmt -> StmtList
-    single stmt1 = singleStmt wsPre stmt1 wsPost
-
-    doBlock :: Block Stmt -> Transformed (Block Stmt)
     doBlock (Block stmtList) = Block <$> modAllStmts f stmtList
-
-singleStmt :: WS -> Stmt -> WS -> StmtList
-singleStmt wsPre stmt wsPost = IC.Intercal wsPre stmt $ IC.Interend wsPost
+    doCase x = (\ stmtList' -> x {caseStmtList = stmtList'}) <$>
+      modAllStmts f (caseStmtList x)
 
 {-
 instance ModAllAble Expr where

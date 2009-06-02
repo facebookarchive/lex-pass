@@ -171,16 +171,15 @@ data Switch = Switch {
   switchExpr  :: Expr,
   switchWS3   :: WS,
   switchWS4   :: WS,
-  switchCases :: [Case],
-  switchWS5   :: WS
+  switchWS5   :: WS,
+  switchCases :: [Case]
   }
   deriving (Eq, Show)
 
 data Case = Case {
-  caseWS1      :: WS,
   caseMbWSExpr :: Maybe (WS, Expr),
-  caseWS2      :: WS,
-  caseWSStmts  :: [(WS, Stmt)]
+  caseWS1      :: WS,
+  caseStmtList :: StmtList
   }
   deriving (Eq, Show)
 
@@ -491,16 +490,14 @@ instance ToToks If where
       ws ++ doElsery elsery ++ toToks condAndBlock
 
 instance ToToks Case where
-  toToks (Case wsCPre header wsC stmts) =
-    wsCPre ++
-    maybe [tokDefault] (\ (ws, expr) -> [tokCase] ++ ws ++ toToks expr)
-      header ++
-    wsC ++ [tokColon] ++ toToks stmts
+  toToks (Case header wsC stmtList) =
+    maybe [tokDefault] (\ (ws, expr) -> [tokCase] ++ ws ++ toToks expr) header
+    ++ wsC ++ [tokColon] ++ toToks stmtList
 
 instance ToToks Switch where
-  toToks (Switch ws1 ws2 expr ws3 ws4 cases ws5) = concat [
+  toToks (Switch ws1 ws2 expr ws3 ws4 ws5 cases) = concat [
     [tokSwitch], ws1, [tokLParen], ws2, toToks expr, ws3, [tokRParen], ws4,
-    [tokLBrace], toToks cases, ws5, [tokRBrace]]
+    [tokLBrace], ws5, toToks cases, [tokRBrace]]
 
 instance ToToks Catch where
   toToks (Catch ws1 ws2 ws3 const ws4 expr ws5 ws6 block) =
@@ -1014,6 +1011,14 @@ instance WParsable For where
     (ws2, block) <- blockOrStmtParser
     return $ For ws1 inits conds incrs ws2 block
 
+adjustCasesWs :: [(WS, Maybe (WS, Expr), WS, [(WS, Stmt)])] -> WS ->
+  (WS, [Case])
+adjustCasesWs [] wsEnd = (wsEnd, [])
+adjustCasesWs ((wsCPre, header, wsC, wsStmts) : cases) wsEnd =
+  (wsCPre, Case header wsC (IC.unbreakEnd wsStmts ws) : cases')
+  where
+  (ws, cases') = adjustCasesWs cases wsEnd
+
 instance WParsable Switch where
   wParser = liftM2 (,) (fst <$> tokEqNoCase tokSwitch) $ do
     (ws1, _) <- tokEq tokLParen
@@ -1022,13 +1027,14 @@ instance WParsable Switch where
     (ws4, _) <- tokEq tokLBrace
     cases <- many $ do
       (wsCPre, header) <-
-        second Just <$> liftM2 (,) (fst <$> tokEqNoCase tokCase) wParser <|>
+        liftM2 (,) (fst <$> tokEqNoCase tokCase) (Just <$> wParser) <|>
         second (const Nothing) <$> tokEqNoCase tokDefault
       (wsC, _) <- tokEq tokColon
-      stmtList <- many wParser
-      return $ Case wsCPre header wsC stmtList
-    (ws5, _) <- tokEq tokRBrace
-    return $ Switch ws1 ws2 expr ws3 ws4 cases ws5
+      wsStmts <- many wParser
+      return (wsCPre, header, wsC, wsStmts)
+    (wsEnd, _) <- tokEq tokRBrace
+    let (ws5, cases') = adjustCasesWs cases wsEnd
+    return $ Switch ws1 ws2 expr ws3 ws4 ws5 cases'
 
 instance WParsable While where
   wParser = liftM2 (,) (fst <$> tokEqNoCase tokWhile) $ do
