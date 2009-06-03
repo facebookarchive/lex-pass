@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell, TypeSynonymInstances #-}
+{-# LANGUAGE DeriveDataTypeable, TemplateHaskell, TypeSynonymInstances #-}
 
 module Ast where
 
@@ -8,9 +8,11 @@ import Control.Monad
 import Control.Monad.Identity
 import Data.Binary
 import Data.DeriveTH
+import Data.Generics hiding (Prefix, Infix)
 import Data.List
 import Data.Maybe
 import Data.Tok
+import Data.Typeable
 import FUtil
 import Text.Parsec hiding (satisfy, oneOf, noneOf, anyToken)
 import Text.Parsec.Expr
@@ -54,7 +56,7 @@ data WSCap a = WSCap {
   wsCapMain :: a,
   wsCapPost :: WS
   }
-  deriving (Eq, Show)
+  deriving (Eq, Show, Typeable, Data)
 
 data Func = Func {
   funcWS1   :: WS,
@@ -65,25 +67,25 @@ data Func = Func {
   funcWS3   :: WS,
   funcBlock :: Block Stmt
   }
-  deriving (Eq, Show)
+  deriving (Eq, Show, Typeable, Data)
 
 data IfaceStmt =
   IfaceConst [WSCap (VarVal Const)] |
   IfaceFunc [(Tok, WS)] WS Const WS (Either WS [FuncArg]) WS StmtEnd
-  deriving (Eq, Show)
+  deriving (Eq, Show, Typeable, Data)
 
 data ClassStmt =
   CStmtVar (IC.Intercal Tok WS) [WSCap VarMbVal] StmtEnd |
   CStmtConst [WSCap (VarVal Const)] |
   CStmtFuncDef [(Tok, WS)] Func |
   CStmtAbsFunc [(Tok, WS)] WS Const WS (Either WS [FuncArg]) WS StmtEnd
-  deriving (Eq, Show)
+  deriving (Eq, Show, Typeable, Data)
 
 data VarMbVal = VarMbVal Var (Maybe (WS, WS, Expr))
-  deriving (Eq, Show)
+  deriving (Eq, Show, Typeable, Data)
 
 data VarVal a = VarVal a WS WS Expr
-  deriving (Eq, Show)
+  deriving (Eq, Show, Typeable, Data)
 
 class Parsable a where
   parser :: Parsec [TokWS] () a
@@ -111,7 +113,7 @@ data DoWhile = DoWhile {
   doWhileWS6     :: WS,
   doWhileStmtEnd :: StmtEnd
   }
-  deriving (Eq, Show)
+  deriving (Eq, Show, Typeable, Data)
 
 data Declare = Declare {
   declareWS1     :: WS,
@@ -124,7 +126,7 @@ data Declare = Declare {
   declareWS6     :: WS,
   declareStmtEnd :: StmtEnd
   }
-  deriving (Eq, Show)
+  deriving (Eq, Show, Typeable, Data)
 
 data For = For {
   forWS1   :: WS,
@@ -134,7 +136,7 @@ data For = For {
   forWS2   :: WS,
   forBlock :: BlockOrStmt
   }
-  deriving (Eq, Show)
+  deriving (Eq, Show, Typeable, Data)
 
 data Foreach = Foreach {
   foreachWS1        :: WS,
@@ -147,13 +149,13 @@ data Foreach = Foreach {
   foreachWS6        :: WS,
   foreachBlock      :: BlockOrStmt
   }
-  deriving (Eq, Show)
+  deriving (Eq, Show, Typeable, Data)
 
 data If = If {
   ifAndIfelses :: IC.Intercal IfBlock (WS, Maybe WS),
   ifElse       :: Maybe (WS, WS, BlockOrStmt)
   }
-  deriving (Eq, Show)
+  deriving (Eq, Show, Typeable, Data)
 
 data IfBlock = IfBlock {
   ifBlockWS1   :: WS,
@@ -163,7 +165,7 @@ data IfBlock = IfBlock {
   ifBlockWS4   :: WS,
   ifBlockBlock :: BlockOrStmt
   }
-  deriving (Eq, Show)
+  deriving (Eq, Show, Typeable, Data)
 
 data Switch = Switch {
   switchWS1   :: WS,
@@ -174,14 +176,14 @@ data Switch = Switch {
   switchWS5   :: WS,
   switchCases :: [Case]
   }
-  deriving (Eq, Show)
+  deriving (Eq, Show, Typeable, Data)
 
 data Case = Case {
   caseMbWSExpr :: Maybe (WS, Expr),
   caseWS1      :: WS,
   caseStmtList :: StmtList
   }
-  deriving (Eq, Show)
+  deriving (Eq, Show, Typeable, Data)
 
 data Catch = Catch {
   catchWS1   :: WS,
@@ -194,7 +196,7 @@ data Catch = Catch {
   catchWS6   :: WS,
   catchBlock :: Block Stmt
   }
-  deriving (Eq, Show)
+  deriving (Eq, Show, Typeable, Data)
 
 data While = While {
   whileWS1   :: WS,
@@ -204,7 +206,7 @@ data While = While {
   whileWS4   :: WS,
   whileBlock :: BlockOrStmt
   }
-  deriving (Eq, Show)
+  deriving (Eq, Show, Typeable, Data)
 
 data Stmt =
   StmtBlock     (Block Stmt)                  |
@@ -233,7 +235,7 @@ data Stmt =
   StmtTry       WS (Block Stmt) [Catch] |
   StmtUnset     WS [WSCap Var] WS StmtEnd     |
   StmtWhile     While
-  deriving (Eq, Show)
+  deriving (Eq, Show, Typeable, Data)
 
 type ForPart = Either WS [WSCap Expr]
 
@@ -241,7 +243,7 @@ type ForPart = Either WS [WSCap Expr]
 -- php also oddly distinguishes "?>" and "?>\n", with no other possibilities.
 -- (note this differs from e.g. "<?=\n" which is treated as "<?=" + "\n".)
 data StmtEnd = StmtEndSemi | StmtEndClose | StmtEndCloseNL
-  deriving (Eq, Show)
+  deriving (Eq, Show, Typeable, Data)
 
 data Define = Define {
   defineWS1   :: WS,
@@ -252,7 +254,7 @@ data Define = Define {
   defineValue :: Expr,
   defineWS5   :: WS
   }
-  deriving (Eq, Show)
+  deriving (Eq, Show, Typeable, Data)
 
 data List = List {
   listWS1  :: WS,
@@ -262,7 +264,7 @@ data List = List {
   listWS3  :: WS,
   listExpr :: Expr
   }
-  deriving (Eq, Show)
+  deriving (Eq, Show, Typeable, Data)
 
 data TernaryIf = TernaryIf {
   ternaryIfTest :: Expr,
@@ -273,7 +275,7 @@ data TernaryIf = TernaryIf {
   ternaryIfWS4  :: WS,
   ternaryIfElse :: Expr
   }
-  deriving (Eq, Show)
+  deriving (Eq, Show, Typeable, Data)
 
 data Expr =
   -- you would have thought these were statements
@@ -371,10 +373,10 @@ data Expr =
   ExprVar      Var                            |
   ExprXor      Expr WS WS Expr                |
   ExprXorWd    Expr WS WS Expr
-  deriving (Eq, Show)
+  deriving (Eq, Show, Typeable, Data)
 
 data DubArrowMb = DubArrowMb (Maybe (Expr, WS, WS)) Expr
-  deriving (Eq, Show)
+  deriving (Eq, Show, Typeable, Data)
 
 -- var means lval
 data Var =
@@ -386,7 +388,7 @@ data Var =
   VarStaticMember Const WS WS Var |
   VarFuncCall SV WS (Either WS [WSCap Expr]) |
   VarRef WS Var
-  deriving (Eq, Show)
+  deriving (Eq, Show, Typeable, Data)
 
 type SV = Either Var Const
 
@@ -397,12 +399,12 @@ data Interface = Interface {
   ifaceExtends :: [WSCap Const],
   ifaceBlock   :: Block IfaceStmt
   }
-  deriving (Eq, Show)
+  deriving (Eq, Show, Typeable, Data)
 
 -- a block has {}'s, so one-liner's are not considered blocks
 -- and a (Block Stmt) is not the same as a StmtList tho it has the same ast
 data Block a = Block (IC.Intercal WS a)
-  deriving (Eq, Show)
+  deriving (Eq, Show, Typeable, Data)
 
 type BlockOrStmt = Either Stmt (Block Stmt)
 
@@ -415,25 +417,25 @@ data Class = Class {
   classImplements :: [WSCap Const],
   classBlock   :: Block ClassStmt
   }
-  deriving (Eq, Show)
+  deriving (Eq, Show, Typeable, Data)
 
 data IncOrReq = Inc | Req
-  deriving (Eq, Show)
+  deriving (Eq, Show, Typeable, Data)
 data OnceOrNot = Once | NotOnce
-  deriving (Eq, Show)
+  deriving (Eq, Show, Typeable, Data)
 
 -- named records here?
 data FuncArg =
   FuncArg WS (Maybe (Maybe Const, WS)) (Maybe WS) Var (Maybe (WS, WS, Expr)) WS
-  deriving (Eq, Show)
+  deriving (Eq, Show, Typeable, Data)
 
 -- hm is Const overused right now?
 data Const = Const String |
   ClassConst String WS WS Const
-  deriving (Eq, Show)
+  deriving (Eq, Show, Typeable, Data)
 
 data StrLit = StrLit String | StrExpr [TokWS] WS | StrHereDoc String [TokWS] WS
-  deriving (Eq, Show)
+  deriving (Eq, Show, Typeable, Data)
 
 instance ToToks IfaceStmt where
   toToks (IfaceConst vars) = cStmtConstToToks vars

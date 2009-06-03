@@ -1,8 +1,10 @@
-{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE DeriveDataTypeable, TypeSynonymInstances #-}
 
 module Data.Tok where
 
 import Data.Char
+import Data.Generics
+import Data.Typeable
 import FUtil hiding (choice)
 import Text.Parsec hiding (satisfy)
 import Text.Parsec.Pos
@@ -10,7 +12,7 @@ import Text.Parsec.Pos
 data Tok = Tok {
   tokGetType :: String,
   tokGetVal :: String
-  } deriving (Eq, Show)
+  } deriving (Eq, Show, Data, Typeable)
 
 instance ParsePos Tok where
   trackTok (Tok tokType tokVal) pos = updatePosString pos tokVal

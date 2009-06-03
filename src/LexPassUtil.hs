@@ -5,6 +5,7 @@ import Control.Applicative
 import Control.Arrow
 import Control.Monad.State
 import Data.Binary
+import Data.Generics
 import Data.Tok
 import FUtil
 import HSH
@@ -104,12 +105,6 @@ lastLine ws = case lastIndent ws of
 wsSp :: [Tok]
 wsSp = [wsTokOf " "]
 
-{-
-class ModAllAble a where
-  modAll :: (WS -> a -> WS -> ([String], Maybe (IC.Intercal WS a))) ->
-             WS -> a -> WS -> State (Bool, [String]) (IC.Intercal WS a)
--}
-
 modIntercal :: (a -> b -> a -> Transformed (IC.Intercal a b)) ->
   IC.Intercal a b -> Transformed (IC.Intercal a b)
 modIntercal f ical = case runState (IC.concatMapM f' ical) ([], False) of
@@ -144,71 +139,47 @@ modAllStmts :: (WS -> Stmt -> WS -> Transformed StmtList) ->
   StmtList -> Transformed StmtList
 modAllStmts f = modIntercal $ \ wsPre s wsPost -> case f wsPre s wsPost of
   t@(Transformed {transfResult = Just _}) -> t
-  _ -> (\ stmt' -> IC.singleton wsPre stmt' wsPost) <$> case s of
+  _ -> (\ a -> IC.singleton wsPre a wsPost) <$> case s of
     StmtDoWhile (x@DoWhile {doWhileBlock = Right block}) ->
-      (\ block' -> StmtDoWhile $ x {doWhileBlock = Right block'}) <$>
-      doBlock block
+      (\ a -> StmtDoWhile $ x {doWhileBlock = Right a}) <$> doBlock block
     StmtFuncDef x ->
-      (\ block' -> StmtFuncDef $ x {funcBlock = block'}) <$>
-        doBlock (funcBlock x)
+      (\ a -> StmtFuncDef $ x {funcBlock = a}) <$> doBlock (funcBlock x)
     StmtFor (x@(For {forBlock = Right block})) -> StmtFor .
-      (\ block' -> x {forBlock = Right block'}) <$> doBlock block
+      (\ a -> x {forBlock = Right a}) <$> doBlock block
     StmtForeach (x@Foreach {foreachBlock = Right block}) -> StmtForeach .
-      (\ block' -> x {foreachBlock = Right block'}) <$> doBlock block
+      (\ a -> x {foreachBlock = Right a}) <$> doBlock block
     StmtIf (If ifAndIfelses theElse) -> StmtIf <$> liftA2 If
       (IC.mapA ifery pure ifAndIfelses) (elsery theElse)
       where
       ifery (x@(IfBlock {ifBlockBlock = Right block})) =
-        (\ block' -> x {ifBlockBlock = Right block'}) <$> doBlock block
+        (\ a -> x {ifBlockBlock = Right a}) <$> doBlock block
       ifery other = pure other
       elsery (Just (ws1, ws2, Right block)) =
-        (\ block' -> Just (ws1, ws2, Right block')) <$> doBlock block
+        (\ a -> Just (ws1, ws2, Right a)) <$> doBlock block
       elsery other = pure other
-    StmtSwitch x -> StmtSwitch . (\ cases' -> x {switchCases = cases'}) <$>
+    StmtSwitch x -> StmtSwitch . (\ a -> x {switchCases = a}) <$>
       modMap doCase (switchCases x)
     _ -> transfNothing
     where
     doBlock (Block stmtList) = Block <$> modAllStmts f stmtList
-    doCase x = (\ stmtList' -> x {caseStmtList = stmtList'}) <$>
-      modAllStmts f (caseStmtList x)
+    doCase x = (\ a -> x {caseStmtList = a}) <$> modAllStmts f (caseStmtList x)
 
-{-
-instance ModAllAble Expr where
-  modAll f wsPre x wsPost = modAll
+transformerToState :: (a -> Transformed a) -> a -> State ([String], Bool) a
+transformerToState f x = case f x of
+  Transformed {infoLines = infoLines, transfResult = Just res} ->
+    withState (\ (i, _) -> (i ++ infoLines, True)) $ return res
+  Transformed {infoLines = infoLines, transfResult = Nothing} ->
+    withState (first (++ infoLines)) $ return x
 
-  case f wsPre func wsPost of
-    Just funcRepl -> xMod
-    Nothing       -> case
--}
+stateToTransformer :: (a -> State ([String], Bool) a) -> a -> Transformed a
+stateToTransformer f x = case runState (f x) ([], False) of
+  (res, (infoLines, True)) ->
+    Transformed {infoLines = infoLines, transfResult = Just res}
+  (_, (infoLines, False)) ->
+    Transformed {infoLines = infoLines, transfResult = Nothing}
 
-{-
-modAllExprs ::
-  (Expr -> ([String], Maybe Expr)) ->
-   WS -> Stmt -> WS -> State (Bool, [String]) StmtList
-modAllExprs f wsPre stmt wsPost = modAllStmts f' wsPre stmt wsPost where
-  f' = case stmt of
-    StmtBreak mbWsExpr ws stmtEnd ->
-      StmtBreak (second fDo <$> mbWsExpr) ws stmtEnd
-    _ -> Nothing
--}
-
-{-
-stmtDoExprs ::
-  (Expr -> ([String], Maybe Expr)) ->
-   Stmt -> ([String], Maybe Stmt)
-stmtDoExprs f = case Stmt of
--}
-
-{-
-changeIfViewsChange ::
-  (a -> ([String], Maybe a)) ->
-  [b -> (a, a -> b)] ->
-  (b -> ([String], Maybe b)
-stmtChangeIfAnyChange f viewers =
-  map viewers
--}
-
-
+modAll :: (Typeable a, Data b) => (a -> Transformed a) -> b -> Transformed b
+modAll f = stateToTransformer (everywhereM (mkM $ transformerToState f))
 
 --
 -- behind-the-scenes/lower-level stuff

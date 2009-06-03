@@ -1,16 +1,19 @@
+{-# LANGUAGE DeriveDataTypeable #-}
+
 module Data.Intercal where
 
 import Control.Arrow
 import Control.Applicative
 import Control.Monad hiding (mapM)
 import Data.Binary
+import Data.Generics
 import Data.Tok
 import Prelude hiding (concatMap, map, mapM)
 import qualified Prelude
 import Text.Parsec
 
 data Intercal a b = Intercal a b (Intercal a b) | Interend a
-  deriving (Eq, Show)
+  deriving (Eq, Show, Typeable, Data)
 
 -- we're using method that should be faster-but-bigger instead of storing
 -- length.  is this the same as the derive one, should we just use that?
