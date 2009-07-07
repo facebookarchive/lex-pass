@@ -36,14 +36,15 @@ options :: [OptDescr (Options -> Options)]
 options = [
   Option "c" ["only-changed-files"]
     (NoArg  (\ opts     -> opts {optOnlyChangedFiles = True}))
-    "Only consider changing files that already have\n\
-    \local modifications (NOTE: git-only currently).",
+    "Only consider changing files that already\n\
+    \have local modifications (NOTE: git-only\n\
+    \currently).",
   Option "d" ["dir"]
     (NoArg  (\ opts     -> opts {optOnlyChangedFiles = True}))
-    "Directory containing files of interest and\n\
-    \up-to-date .tok files for them (in .tok/\n\
-    \sub-dir).  Defaults to\n\
-    \current-working-directory.",
+    "Top-level directory containing parsable\n\
+    \files of interest.  Abstract syntax trees\n\
+    \will be cached in top-level .ast/\n\
+    \directory.",
   Option "f" ["files"]
     (NoArg  (\ opts     -> opts {optFiles = True}))
     "Pass a specific list of files to stdin\n\
