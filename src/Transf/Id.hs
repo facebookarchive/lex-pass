@@ -1,11 +1,7 @@
 module Transf.Id where
 
-import Control.Applicative
-import Control.Arrow
-import Data.Tok
-import FUtil
-import Lang.Php.Ast
-import LexPassUtil
+import Lang.Php
+import TransfUtil
 import qualified Data.Intercal as IC
 
 transfs :: [Transf]

@@ -1,14 +1,7 @@
 module Transf.ExampleGlolbal where
 
-import Lang.Php.Ast
-import Lang.Php.Tok
-import Lang.Php.Transf
-import Control.Applicative
-import Data.Ast
-import Data.List
-import Data.Tok
-import FUtil
-import LexPassUtil
+import Lang.Php
+import TransfUtil
 import qualified Data.Intercal as IC
 
 transfs :: [Transf]
