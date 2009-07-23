@@ -1,9 +1,9 @@
 module LexPassUtil where
 
-import Ast
 import Control.Applicative
 import Control.Arrow
 import Control.Monad.State
+import Data.Ast
 import Data.Binary
 import Data.Generics
 import Data.Tok
@@ -60,7 +60,7 @@ argless :: (t -> t1 -> t2) -> [a] -> t -> t1 -> t2
 argless f args dir subPath = if null args then f dir subPath
   else error "Expected no arguments."
 
-lexPass :: (StmtList -> Transformed StmtList) ->
+lexPass :: (StmtLike s) => (InterWS s -> Transformed (InterWS s)) ->
   FilePath -> FilePath -> Int -> Int -> CanErrStrIO (Bool, [String])
 lexPass transf codeDir subPath total cur = do
   io . hPutStrLn stderr $ "Checking (" ++ show cur ++ "/" ++ show total ++
@@ -69,11 +69,11 @@ lexPass transf codeDir subPath total cur = do
   case transf ast of
     Transformed {infoLines = infoLines, transfResult = Nothing} ->
       return (False, infoLines)
-    Transformed {infoLines = infoLines, transfResult = Just ast'} -> do
-      io $ hPutStrLn stderr "- Saving"
-      io . writeFile (codeDir </> subPath) . concat . map tokGetVal $
+    Transformed {infoLines = infoLines, transfResult = Just ast'} -> io $ do
+      hPutStrLn stderr "- Saving"
+      writeFile (codeDir </> subPath) . concat . map tokGetVal $
         toToks ast'
-      io $ encodeFile (astPath codeDir subPath) ast'
+      encodeFile (astPath codeDir subPath) ast'
       return (True, infoLines)
 
 --
@@ -133,37 +133,6 @@ modMap f xs = case runState (mapM f' xs) ([], False) of
     Transformed {infoLines = infoLines, transfResult = Nothing} ->
       withState (first (++ infoLines)) $ return x
 
--- ignores single-statement if/etc blocks currently
--- (we _could_ convert them out of single-statement-ness on change)
-modAllStmts :: (WS -> Stmt -> WS -> Transformed StmtList) ->
-  StmtList -> Transformed StmtList
-modAllStmts f = modIntercal $ \ wsPre s wsPost -> case f wsPre s wsPost of
-  t@(Transformed {transfResult = Just _}) -> t
-  _ -> (\ a -> IC.singleton wsPre a wsPost) <$> case s of
-    StmtDoWhile (x@DoWhile {doWhileBlock = Right block}) ->
-      (\ a -> StmtDoWhile $ x {doWhileBlock = Right a}) <$> doBlock block
-    StmtFuncDef x ->
-      (\ a -> StmtFuncDef $ x {funcBlock = a}) <$> doBlock (funcBlock x)
-    StmtFor (x@(For {forBlock = Right block})) -> StmtFor .
-      (\ a -> x {forBlock = Right a}) <$> doBlock block
-    StmtForeach (x@Foreach {foreachBlock = Right block}) -> StmtForeach .
-      (\ a -> x {foreachBlock = Right a}) <$> doBlock block
-    StmtIf (If ifAndIfelses theElse) -> StmtIf <$> liftA2 If
-      (IC.mapA ifery pure ifAndIfelses) (elsery theElse)
-      where
-      ifery (x@(IfBlock {ifBlockBlock = Right block})) =
-        (\ a -> x {ifBlockBlock = Right a}) <$> doBlock block
-      ifery other = pure other
-      elsery (Just (ws1, ws2, Right block)) =
-        (\ a -> Just (ws1, ws2, Right a)) <$> doBlock block
-      elsery other = pure other
-    StmtSwitch x -> StmtSwitch . (\ a -> x {switchCases = a}) <$>
-      modMap doCase (switchCases x)
-    _ -> transfNothing
-    where
-    doBlock (Block stmtList) = Block <$> modAllStmts f stmtList
-    doCase x = (\ a -> x {caseStmtList = a}) <$> modAllStmts f (caseStmtList x)
-
 transformerToState :: (a -> Transformed a) -> a -> State ([String], Bool) a
 transformerToState f x = case f x of
   Transformed {infoLines = infoLines, transfResult = Just res} ->
@@ -206,7 +175,7 @@ readToks codeDir subPath = fmap (map tokParseKillPos . lines) . run $
 transfModsFile :: Parsec s (Bool, b) ()
 transfModsFile = updateState ((,) True . snd)
 
-parseAndCache :: FilePath -> FilePath -> IO StmtList
+parseAndCache :: (StmtLike s) => FilePath -> FilePath -> IO (InterWS s)
 parseAndCache codeDir subPath = do
   let
     astFilename = astPath codeDir subPath
@@ -246,6 +215,15 @@ runInp cmd inp = do
   waitForProcess pH
   hGetContents pOut
 
+{-
+absorbWs :: [Tok] -> InterWS Tok
+absorbWs toks = if null rest
+  then IC.Interend ws
+  else IC.Intercal ws rest1 $ absorbWs restRest
+  where
+  (ws, rest) = span ((`elem` wsTokTypes) . tokGetType) toks
+  rest1:restRest = rest
+
 showFragment :: (Show a) => String -> Parsec [TokWS] () a -> String -> IO ()
 showFragment name p s = do
   toks <- lexFragment s
@@ -270,6 +248,7 @@ showFile :: String -> IO ()
 showFile name = do
   home <- getHomeDirectory
   showWhole name =<< readFileStrict (home </> "www" </> name)
+-}
 
 --
 -- eof

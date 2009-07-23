@@ -1,7 +1,10 @@
 module Transf.ExampleGlolbal where
 
-import Ast
+import Lang.Php.Ast
+import Lang.Php.Tok
+import Lang.Php.Transf
 import Control.Applicative
+import Data.Ast
 import Data.List
 import Data.Tok
 import FUtil

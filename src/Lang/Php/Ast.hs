@@ -1,11 +1,12 @@
 {-# LANGUAGE DeriveDataTypeable, TemplateHaskell, TypeSynonymInstances #-}
 
-module Ast where
+module Lang.Php.Ast where
 
 import Control.Applicative ((<$>), (*>), (<*))
 import Control.Arrow
 import Control.Monad
 import Control.Monad.Identity
+import Data.Ast
 import Data.Binary
 import Data.DeriveTH
 import Data.Generics hiding (Prefix, Infix)
@@ -14,6 +15,7 @@ import Data.Maybe
 import Data.Tok
 import Data.Typeable
 import FUtil
+import Lang.Php.Tok
 import Text.Parsec hiding (satisfy, oneOf, noneOf, anyToken)
 import Text.Parsec.Expr
 import Text.Parsec.Pos
@@ -45,18 +47,16 @@ import qualified Data.Intercal as IC
 -- TODO: also might need to do a bit with optimizing around var/lval.. things
 -- got much slower with them
 
-type StmtList = IC.Intercal WS Stmt
+-- move this..
+absorbWs :: [Tok] -> InterWS Tok
+absorbWs toks = if null rest
+  then IC.Interend ws
+  else IC.Intercal ws rest1 $ absorbWs restRest
+  where
+  (ws, rest) = span ((`elem` wsTokTypes) . tokGetType) toks
+  rest1:restRest = rest
 
-type WS = [Tok]
-
-type TokWS = (WS, Tok)
-
-data WSCap a = WSCap {
-  wsCapPre :: WS,
-  wsCapMain :: a,
-  wsCapPost :: WS
-  }
-  deriving (Eq, Show, Typeable, Data)
+type StmtList = InterWS Stmt
 
 data Func = Func {
   funcWS1   :: WS,
@@ -86,21 +86,6 @@ data VarMbVal = VarMbVal Var (Maybe (WS, WS, Expr))
 
 data VarVal a = VarVal a WS WS Expr
   deriving (Eq, Show, Typeable, Data)
-
-class Parsable a where
-  parser :: Parsec [TokWS] () a
-
-class WParsable a where
-  wParser :: Parsec [TokWS] () (WS, a)
-
-class ModExprs a where
-  modExprs :: (Expr -> ([String], Maybe Expr)) -> a -> State (Bool, [String]) a
-
-{-
-instance ModExprs Stmt where
-  modExprs f (StmtBlock) =
-  modExprs f x = x
--}
 
 data DoWhile = DoWhile {
   doWhileWS1     :: WS,
@@ -812,14 +797,6 @@ instance ParsePos TokWS where
 instance Toklike TokWS where
   selfToTok = snd
 
-absorbWs :: [Tok] -> IC.Intercal WS Tok
-absorbWs toks = if null rest
-  then IC.Interend ws
-  else IC.Intercal ws rest1 $ absorbWs restRest
-  where
-  (ws, rest) = span ((`elem` wsTokTypes) . tokGetType) toks
-  rest1:restRest = rest
-
 wsTokTypes :: [String]
 wsTokTypes =
   ["WHITESPACE", "COMMENT", "DOC_COMMENT", "OPEN_TAG", "INLINE_HTML"]
@@ -921,10 +898,6 @@ varStaticParser = do
 
 argsToks :: (ToToks t, ToToks s) => Either t [s] -> [Tok]
 argsToks = either toToks (intercalate [tokComma] . map toToks)
-
-parseAst :: String -> [Tok] -> Either ParseError StmtList
-parseAst filename toks = runParser (fileParser wsEnd) () filename toksWs where
-  (toksWs, wsEnd) = IC.breakEnd $ absorbWs toks
 
 fileParser :: WS -> Parsec [TokWS] () StmtList
 fileParser ws = stmtListParser ws <* eof
@@ -1640,9 +1613,12 @@ $(derive makeBinary ''StmtEnd)
 $(derive makeBinary ''StrLit)
 $(derive makeBinary ''Switch)
 $(derive makeBinary ''TernaryIf)
-$(derive makeBinary ''Tok)
 $(derive makeBinary ''Var)
 $(derive makeBinary ''VarMbVal)
 $(derive makeBinary ''VarVal)
 $(derive makeBinary ''While)
-$(derive makeBinary ''WSCap)
+
+instance StmtLike Stmt where
+  parseAst filename toks = runParser (fileParser wsEnd) () filename toksWs
+    where (toksWs, wsEnd) = IC.breakEnd $ absorbWs toks
+

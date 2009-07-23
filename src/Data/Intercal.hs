@@ -7,7 +7,6 @@ import Control.Applicative
 import Control.Monad hiding (mapM)
 import Data.Binary
 import Data.Generics
-import Data.Tok
 import Prelude hiding (concatMap, map, mapM)
 import qualified Prelude
 import Text.Parsec
@@ -25,10 +24,6 @@ instance (Binary a, Binary b) => Binary (Intercal a b) where
     case tag of
       0 -> liftM3 Intercal get get get
       1 -> liftM  Interend get
-
-instance (ToToks a, ToToks b) => ToToks (Intercal a b) where
-  toToks (Interend a) = toToks a
-  toToks (Intercal a b i) = concat [toToks a, toToks b, toToks i]
 
 intercalParser :: Parsec [t] () a -> Parsec [t] () b ->
   Parsec [t] () (Intercal a b)

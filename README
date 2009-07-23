@@ -37,3 +37,8 @@ notes for those hacking on lex-pass itself
   - we might actually get better perf with our own lexer, or at least not
     restarting php over and over again to do lexing.  but not worth looking
     into any time soon?
+  - resolve xWs/xWS, xAst/xAST variable-capitalization indecision
+  - future langs
+    - css - easy and relevant, but maybe a css-preprocessor is better to use
+    - js  - relevant
+    - bash (we should probably just stop using..), c, python

@@ -1,4 +1,4 @@
-import Ast
+import Lang.Php.Ast
 import Control.Monad
 import Control.Monad.Error
 import Data.Char

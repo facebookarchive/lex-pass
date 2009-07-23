@@ -1,10 +1,10 @@
 module Transf.Id where
 
-import Ast
 import Control.Applicative
 import Control.Arrow
 import Data.Tok
 import FUtil
+import Lang.Php.Ast
 import LexPassUtil
 import qualified Data.Intercal as IC
 
