@@ -1004,7 +1004,7 @@ instance WParsable Switch where
       (wsCPre, header) <-
         liftM2 (,) (fst <$> tokEqNoCase tokCase) (Just <$> wParser) <|>
         second (const Nothing) <$> tokEqNoCase tokDefault
-      (wsC, _) <- tokEq tokColon
+      (wsC, _) <- tokEq tokColon <|> tokEq tokSemi
       wsStmts <- many wParser
       return (wsCPre, header, wsC, wsStmts)
     (wsEnd, _) <- tokEq tokRBrace
