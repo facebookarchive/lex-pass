@@ -6,7 +6,7 @@ import Control.Arrow
 import Control.Applicative
 import Control.Monad hiding (mapM)
 import Data.Binary
-import Data.Generics
+import Data.Data
 import Prelude hiding (concatMap, map, mapM)
 import qualified Prelude
 import Text.Parsec
