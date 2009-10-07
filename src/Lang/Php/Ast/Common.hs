@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveDataTypeable, TemplateHaskell, TypeSynonymInstances #-}
 
 module Lang.Php.Ast.Common (
+  module Common,
   module Control.Applicative,
   module Control.Arrow,
   module Control.Monad,
@@ -11,27 +12,26 @@ module Lang.Php.Ast.Common (
   module Data.List,
   module Data.Maybe,
   module FUtil,
-  module Text.Parsec,
   Parse(..), ParseW(..), Unparse(..),
   WS(..), WS2, WSCap(..), capify, wsNoNLParser) where
 
+import Common
 import Control.Applicative hiding ((<|>), many, optional, Const)
 import Control.Arrow
 import Control.Monad
 import Data.Binary
 import Data.Char
-import Data.Data hiding (Prefix)
+import Data.Data hiding (Prefix, Infix)
 import Data.DeriveTH
 import Data.List
 import Data.Maybe
 import FUtil
-import Text.Parsec hiding (parse, choice, uncons)
 
 class Parse a where
-  parse :: Parsec String () a
+  parse :: Parser a
 
 class ParseW a where
-  parseW :: Parsec String () (a, WS)
+  parseW :: Parser (a, WS)
 
 class Unparse a where
   unparse :: a -> String
@@ -42,8 +42,6 @@ instance Unparse String where
 instance (Unparse a, Unparse b) => Unparse (Either a b) where
   unparse (Left a) = unparse a
   unparse (Right a) = unparse a
-
--- this is just here because WS is in the definition of WParse.  idk.
 
 data WS = WS String
   deriving (Show, Eq, Typeable, Data)
@@ -56,10 +54,10 @@ instance Parse WS where
 instance Unparse WS where
   unparse (WS a) = a
 
-wsReqParser :: Parsec String () WS
+wsReqParser :: Parser WS
 wsReqParser = WS <$> many1 space
 
-wsNoNLParser :: Parsec String () WS
+wsNoNLParser :: Parser WS
 wsNoNLParser = WS <$> many (satisfy (\ x -> isSpace x && x /= '\n'))
 
 data WSCap a = WSCap {

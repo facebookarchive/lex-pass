@@ -9,19 +9,18 @@ import qualified Data.Intercal as IC
 -- Val's are defined to only contain: "$", identifiers, "[Expr]", "[]", "()",
 -- "${Expr}", "::", "->".  The most important consideration is which ones
 -- can be assigned to (LVal's) and which ones can be assigned from (RVal's).
--- In php, most but not all LVal's are also RVal's.
+-- In PHP, most but not all LVal's are also RVal's.
 
 -- Note that this grammar allows "$$a[]->a = 5;" but Zend does not.  However,
--- I cannot see why not since Zend allows "${$a}[]->a = 5;", and it's not
--- clear what is gained by treating $a and ${..} asymmetrically here.
--- Php also allows "${$a}[0]->a = 5" and "$$a[0]->a = 5;".  So I'm regarding
--- this as a quirk (more specifically, a theoretically pointless limitation)
--- that is a by-product of their implementation.  In particular, I think they
--- simplify their job by slurping all [Expr?]'s onto Var's and only later
--- analyze things with regard to LVal considerations, simply fataling if
--- something is then arwy.
+-- Zend allows "${$a}[]->a = 5;", and it's not clear what is gained by treating
+-- $a and ${..} asymmetrically here.  Php also allows "${$a}[0]->a = 5" and
+-- "$$a[0]->a = 5;".  So we're regarding this as a theoretically-pointless
+-- limitation that is a by-product of the Zend implementation.  In particular,
+-- we think they simplify their job by slurping all [Expr?]'s onto Var's and
+-- only later analyze things with regard to LVal considerations, simply
+-- fataling if something is then arwy.
 --
--- I think think modeling that nuance is impractical in the cleaner division of
+-- I think modeling that nuance is impractical in the clear division of
 -- Var's, LVal's, and RVal's that we desire to make the AST nice for
 -- refactoring.
 
@@ -52,7 +51,7 @@ data LRVal =
 
 data LOnlyVal =
   LOnlyValList   WS (Either WS [Either WS (WSCap LVal)]) |
-  LOnlyValAppend LVal WS2                 | -- "$a[]"
+  LOnlyValAppend LVal WS2             | -- "$a[]"
   LOnlyValInd    LOnlyVal WS (WSCap Expr) | -- "$a[][0]"
   LOnlyValMemb   LOnlyVal WS2 String        -- "$a[]->a"
   deriving (Eq, Show, Typeable, Data)
@@ -66,21 +65,14 @@ data ROnlyVal =
   ROnlyValFunc  (Either LRVal Const) WS (Either WS [WSCap Expr])
   deriving (Eq, Show, Typeable, Data)
 
-lRValOrConstParser = do
-  v <- parseW
-  case v of
-    ValLRVal a -> a
-    ValROnlyVal (ROnlyValConst a) -> a
-    _ -> fail "Expected LRVal or Const but fould a different Val type."
-
 -- Expr's
 
 data Expr =
   ExprArray     WS (Either WS ([WSCap DubArrowMb], Maybe WS)) |
-  ExprAssign    (Maybe WS) LVal WS2 Expr | -- "$res = !$b = $c;"
+  ExprAssign    (Maybe BinOpBy) LVal WS2 Expr |
   ExprBackticks String |
   ExprBinOp     BinOp Expr WS2 Expr |
-  -- i'm lazy so just String here instead of like (WS PhpType WS) (fixme?)
+  -- i'm lazy so just String here instead of like PhpType (fixme?)
   ExprCast      (WSCap String) WS Expr |
   ExprEmpty     WS (WSCap Var) |
   ExprEval      WS (WSCap Expr) |
@@ -97,7 +89,9 @@ data Expr =
   ExprPreOp     PreOp WS Expr |
   ExprPreIncr   IncrOrDecr WS Var |
   ExprPostIncr  IncrOrDecr Var WS |
-  ExprRef       WS Val |
+  -- "&" is actually more limited ("list() = &$a;" is nonsyntactic)
+  -- but this is good enough
+  ExprRef       WS Var |
   ExprRVal      RVal |
   ExprStrLit    StrLit |
   ExprTernaryIf TernaryIf
@@ -106,12 +100,13 @@ data Expr =
 data IncrOrDecr = Incr | Decr
   deriving (Eq, Show, Typeable, Data)
 
-data BinOp = BAnd | BAndWd | BBitAnd | BBitAndBy | BBitOr | BBitOrBy |
-  BConcat | BConcatBy | BDiv | BDivBy | BEQ | BGE | BGT | BID | BLE | BLT |
-  BMinus | BMinusBy | BMod | BModBy | BMul | BMulBy | BNE |
+data BinOp = BAnd | BAndWd | BEQ | BGE | BGT | BID | BLE | BLT | BNE |
   -- <> has different precedence than !=
-  BNEOld | BNI | BOr | BOrWd | BPlus | BPlusBy | BShiftL | BShiftLBy |
-  BShiftR | BShiftRBy | BXor | BXorBy | BXorWd
+  BNEOld | BNI | BOr | BOrWd | BXorWd | BByable BinOpBy
+  deriving (Eq, Show, Typeable, Data)
+
+data BinOpBy = BBitAnd | BBitOr | BConcat | BDiv | BMinus | BMod | BMul |
+  BPlus | BShiftL | BShiftR | BXor
   deriving (Eq, Show, Typeable, Data)
 
 data PreOp = PrPrint | PrAt | PrBitNot | PrClone | PrNegate | PrNot | PrPos |
@@ -136,6 +131,7 @@ data DubArrowMb = DubArrowMb (Maybe (Expr, WS2)) Expr
   deriving (Eq, Show, Typeable, Data)
 
 $(derive makeBinary ''BinOp)
+$(derive makeBinary ''BinOpBy)
 $(derive makeBinary ''Const)
 $(derive makeBinary ''DubArrowMb)
 $(derive makeBinary ''DynConst)

@@ -7,7 +7,7 @@ import Lang.Php.Ast.ArgList
 import Lang.Php.Ast.Common
 import Lang.Php.Ast.ExprTypes
 import Lang.Php.Ast.Lex
-import Text.Parsec.Expr
+import Text.ParserCombinators.Parsec.Expr
 import qualified Data.Intercal as IC
 
 -- Val
@@ -180,6 +180,13 @@ instance ParseW Const where
     rePairLeft (a, (b, c)) = ((a, b), c)
     rePairRight ((a, b), c) = (a, (b, c))
 
+lRValOrConstParser = do
+  (v, w) <- parseW
+  case v of
+    ValLRVal a -> return (Left a, w)
+    ValROnlyVal (ROnlyValConst a) -> return (Right a, w)
+    _ -> fail "Expected LRVal or Const but fould a different Val type."
+
 -- Expr
 
 instance Unparse Expr where
@@ -213,7 +220,7 @@ instance Unparse Expr where
     ExprPreOp o w e -> unparse o ++ unparse w ++ unparse e
     ExprPreIncr t w v -> unparse t ++ unparse w ++ unparse v
     ExprPostIncr t v w -> unparse t ++ unparse v ++ unparse w
-    ExprRef w v -> unparse tokRef ++ unparse w ++ unparse v
+    ExprRef w v -> unparse tokAmp ++ unparse w ++ unparse v
     ExprRVal a -> unparse a
     ExprStrLit a -> unparse a
     ExprTernaryIf a -> unparse a
@@ -222,44 +229,37 @@ instance Unparse IncrOrDecr where
   unparse Incr = tokIncr
   unparse Decr = tokDecr
 
+instance Unparse BinOpBy where
+  unparse binOp = case binOp of
+    BBitAnd -> tokAmp
+    BBitOr -> tokBitOr
+    BConcat -> tokConcat
+    BDiv -> tokDiv
+    BMinus -> tokMinus
+    BMod -> tokMod
+    BMul -> tokMul
+    BPlus -> tokPlus
+    BShiftL -> tokShiftL
+    BShiftR -> tokShiftR
+    BXor -> tokXor
+
 instance Unparse BinOp where
   unparse binOp = case binOp of
     BAnd -> tokAnd
     BAndWd -> tokAndWd
-    BBitAnd -> tokBitAnd
-    BBitAndBy -> tokBitAndBy
-    BBitOr -> tokBitOr
-    BBitOrBy -> tokBitOrBy
-    BConcat -> tokConcat
-    BConcatBy -> tokConcatBy
-    BDiv -> tokDiv
-    BDivBy -> tokDivBy
     BEQ -> tokEQ
     BGE -> tokGE
     BGT -> tokGT
     BID -> tokID
     BLE -> tokLE
     BLT -> tokLT
-    BMinus -> tokMinus
-    BMinusBy -> tokMinusBy
-    BMod -> tokMod
-    BModBy -> tokModBy
-    BMul -> tokMul
-    BMulBy -> tokMulBy
     BNE -> tokNE
     BNEOld -> tokNEOld
     BNI -> tokNI
     BOr -> tokOr
     BOrWd -> tokOrWd
-    BPlus -> tokPlus
-    BPlusBy -> tokPlusBy
-    BShiftL -> tokShiftL
-    BShiftLBy -> tokShiftLBy
-    BShiftR -> tokShiftR
-    BShiftRBy -> tokShiftRBy
-    BXor -> tokXor
-    BXorBy -> tokXorBy
     BXorWd -> tokXorWd
+    BByable o -> unparse o ++ tokEquals
 
 instance Unparse PreOp where
   unparse preOp = case preOp of
@@ -290,10 +290,18 @@ instance Unparse TernaryIf where
     unparse w4 ++ unparse e3
 
 instance ParseW Expr where
-  parseW = buildExpressionParser exprParserTable simpleExprParser
+  parseW = buildExpressionParser exprAfterByTable exprUpToByParser
+
+assignEtcParser :: Parsec String () (Expr, WS)
+assignEtcParser = do
+  notMb <- optionMaybe (tokNotP >> parse)
+  var <-
+
+  liftM2 (\ a (b, c) -> (ExprPreOp PrNot a b, c)) (tokNotP >> parse) parseW
+  <|> first ExprRVal <$> parseW
 
 simpleExprParser :: Parsec String () (Expr, WS)
-simpleExprParser = first ExprRVal <$> parseW
+simpleExprParser = assignOrNotOrRValParser
   <|> first ExprStrLit <$> parseW
   <|> first ExprNumLit <$> parseW
   <|> do
@@ -330,6 +338,7 @@ simpleExprParser = first ExprRVal <$> parseW
     case argMb of
       Just arg -> (,) (ExprExit isExit $ Just (ws1, arg)) <$> parse
       _ -> return (ExprExit isExit Nothing, ws1)
+  --[Prefix eptRef],
   {-
   ExprPreIncr
   ExprPostIncr
@@ -359,42 +368,90 @@ funclike1Parser :: (ParseW a) => (WS -> WSCap a -> b) -> Parsec String () c ->
 funclike1Parser constr tokP = liftM2 constr (tokP >> parse) $
   liftM2 capify (tokLParenP >> parse) (parseW <* tokRParenP)
 
-exprParserTable :: [[Operator String () Identity (Expr, WS)]]
-exprParserTable = [
+exprUpToByTable :: [[Operator String () Identity (Expr, WS)]]
+exprUpToByTable = [
   [Prefix eptClone],
   {-
   [Prefix eptPreIncr, Prefix eptPreDecr,
    Postfix eptPostIncr, Postfix eptPostDecr],
    -}
-
-  fAll Prefix [eptBitNot, eptNegate, eptPos, eptAt],
-  [Postfix eptInstOf]
-
-  ]
-  {-
+  map Prefix [eptBitNot, eptNegate, eptPos, eptAt],
+  [Postfix eptInstOf],
   [Prefix $ preRep eptNot],
   ial [eptMul, eptDiv, eptMod],
   ial [eptPlus, eptMinus, eptConcat],
   ial [eptShiftL, eptShiftR],
   ian [eptLT, eptLE, eptGT, eptGE, eptNEOld],
   ian [eptEQ, eptNE, eptID, eptNI],
-  [Prefix eptRef],
   ial [eptBitAnd],
-  ial [eptBitXor],
+  ial [eptXor],
   ial [eptBitOr],
   [Prefix eptPrint],
   ial [eptAnd],
   ial [eptOr],
-  [Postfix eptTernaryIf],
-  [Infix eptXBy AssocRight],
-  ial [eptAndWd],
-  ial [eptXorWd],
-  ial [eptOrWd]
-  ]
+  [Postfix eptTernaryIf]]
+
+--eptRef    = preOp PrRef   tokRefP
+--eptPreIncr  = wsAfter  ExprPreIncr  (try tokIncrP)
+{-
+eptPreDecr  = wsAfter  ExprPreDecr  tokDecr
+eptPostIncr = wsBefore ExprPostIncr tokIncr
+eptPostDecr = wsBefore ExprPostDecr tokDecr
 -}
 
-fAll :: (t -> t1) -> [t] -> [t1]
-fAll f xs = [f x | x <- xs]
+exprUpToByParser :: Parsec String () (Expr, WS)
+exprUpToByParser = do
+  r@(e1, ws1) <- p
+  case e1 of
+    ExprRVal
+  oMb <- optionMaybe $ (tokEqualsP >> return Nothing) <|> Just <$> (
+    (tokPlusByP  >> return BPlus) <|>
+    (tokMinusBy  >> return BMinus) <|>
+    (tokMulBy    >> return BMul) <|>
+    (tokDivBy    >> return BDiv) <|>
+    (tokConcatBy >> return BConcat) <|>
+    (tokModBy    >> return BMod) <|>
+    (tokBitAndBy >> return BBitAnd) <|>
+    (tokBitOrBy  >> return BBitOr) <|>
+    (tokBitXorBy >> return BBitXor) <|>
+    (tokShiftLBy >> return BShiftL) <|>
+    (tokShiftRBy >> return BShiftR))
+  case oMb of
+    Just o -> do
+      ws2 <- parse
+    Nothing -> return r
+
+
+  (ws1, constr) <-
+
+    (tokEqualsP >> undefined) <|>
+    --second (const ExprAssign)   <$> tokEqualsP   <|>
+    second (const ExprPlusBy)   <$> tokPlusByP   <|>
+    second (const ExprMinusBy)  <$> tokMinusByP  <|>
+    second (const ExprMulBy)    <$> tokMulByP    <|>
+    second (const ExprDivBy)    <$> tokDivByP    <|>
+    second (const ExprConcatBy) <$> tokConcatByP <|>
+    second (const ExprModBy)    <$> tokModByP    <|>
+    second (const ExprBitAndBy) <$> tokBitAndByP <|>
+    second (const ExprBitOrBy)  <$> tokBitOrByP  <|>
+    second (const ExprBitXorBy) <$> tokBitXorByP <|>
+    second (const ExprShiftLBy) <$> tokShiftLByP <|>
+    second (const ExprShiftRBy) <$> tokShiftRByP
+  where p = buildExpressionParser exprUpToByTable simpleExprParser
+
+exprAfterByTable :: [[Operator String () Identity (Expr, WS)]]
+exprAfterByTable = [
+  ial [eptAndWd],
+  ial [eptXorWd],
+  ial [eptOrWd]]
+
+preRep, postRep :: Parsec String () (a -> a) -> Parsec String () (a -> a)
+preRep p = (p >>= \ f -> (f .) <$> preRep p) <|> return id
+postRep p = (p >>= \ f -> (. f) <$> postRep p) <|> return id
+
+ial, ian :: [Parsec String () (a -> a -> a)] -> [Operator String () Identity a]
+ial = map $ flip Infix AssocLeft
+ian = map $ flip Infix AssocNone
 
 eptClone = preOp PrClone tokCloneP
 
@@ -404,161 +461,62 @@ preOp o p = do
   ws1 <- p >> parse
   return . first $ ExprPreOp o ws1
 
+binOp :: BinOp -> Parsec String () a ->
+  Parsec String () ((Expr, WS) -> (Expr, WS) -> (Expr, WS))
+binOp o p = do
+  ws2 <- p >> parse
+  return $ \ (e1, ws1) (e2, ws3) -> (ExprBinOp o e1 (ws1, ws2) e2, ws3)
+
 eptBitNot = preOp PrBitNot tokBitNotP
 eptNegate = preOp PrNegate tokMinusP
 eptPos    = preOp PrPos tokPlusP
 eptAt     = preOp PrSuppress tokAtP
 
 eptInstOf = do
-  tokInstanceOfP
-  lRValOrConstParser
-  (ws2, sv) <- parseW
-  return . second $ \ e -> ExprInstOf e ws1 ws2 sv
---eptPreIncr  = wsAfter  ExprPreIncr  (try tokIncrP)
-{-
-eptPreDecr  = wsAfter  ExprPreDecr  tokDecr
-eptPostIncr = wsBefore ExprPostIncr tokIncr
-eptPostDecr = wsBefore ExprPostDecr tokDecr
+  tokInstanceofP
+  ws2 <- parse
+  (t, ws3) <- lRValOrConstParser
+  return $ \ (e, ws1) -> (ExprInstOf e (ws1, ws2) t, ws3)
 
-eptNot    = wsAfter ExprNot    tokBang
-eptMul    = wsInfix ExprMul    tokMul
-eptDiv    = wsInfix ExprDiv    tokDiv
-eptMod    = wsInfix ExprMod    tokMod
-eptPlus   = wsInfix ExprPlus   tokPlus
-eptMinus  = wsInfix ExprMinus  tokMinus
-eptConcat = wsInfix ExprConcat tokConcat
-eptShiftL = wsInfix ExprShiftL tokShiftL
-eptShiftR = wsInfix ExprShiftR tokShiftR
-eptLT     = wsInfix ExprLT     tokLT
-eptLE     = wsInfix ExprLE     tokLE
-eptGT     = wsInfix ExprGT     tokGT
-eptGE     = wsInfix ExprGE     tokGE
-eptNEOld  = wsInfix ExprNEOld  tokNEOld
-eptEQ     = wsInfix ExprEQ     tokEQ
-eptNE     = wsInfix ExprNE     tokNE
-eptID     = wsInfix ExprID     tokID
-eptNI     = wsInfix ExprNI     tokNI
-eptRef    = wsAfter ExprRef    tokRef
-eptBitAnd = wsInfix ExprBitAnd tokBitAnd
-eptBitXor = wsInfix ExprBitXor tokBitXor
-eptBitOr  = wsInfix ExprBitOr  tokBitOr
-eptAnd    = wsInfix ExprAnd    tokAnd
-eptOr     = wsInfix ExprOr     tokOr
+eptNot = preOp PrNot tokNotP
+
+eptMul = binOp (BByable BMul) tokMulP
+eptDiv = binOp (BByable BDiv) tokDivP
+eptMod = binOp (BByable BMod) tokModP
+eptPlus   = binOp (BByable BPlus) tokPlusP
+eptMinus  = binOp (BByable BMinus) tokMinusP
+eptConcat = binOp (BByable BConcat) tokConcatP
+eptShiftL = binOp (BByable BShiftL) tokShiftLP
+eptShiftR = binOp (BByable BShiftR) tokShiftRP
+eptLT     = binOp BLT     tokLTP
+eptLE     = binOp BLE     tokLEP
+eptGT     = binOp BGT     tokGTP
+eptGE     = binOp BGE     tokGEP
+eptNEOld  = binOp BNEOld  tokNEOldP
+eptEQ     = binOp BEQ     tokEQP
+eptNE     = binOp BNE     tokNEP
+eptID     = binOp BID     tokIDP
+eptNI     = binOp BNI     tokNIP
+
+eptBitAnd = binOp (BByable BBitAnd) tokAmpP
+eptXor    = binOp (BByable BXor) tokXorP
+eptBitOr  = binOp (BByable BBitOr) tokBitOrP
+
+eptPrint  = preOp PrPrint tokPrintP
+
+eptAnd    = binOp BAnd    tokAndP
+eptOr     = binOp BOr     tokOrP
+
+eptTernaryIf :: Parsec String () ((Expr, WS) -> (Expr, WS))
 eptTernaryIf = do
-  (ws1, _) <- tokEq tokQuestion
-  (ws2, expr1) <- parseW
-  (ws3, _) <- tokEq tokColon
-  (ws4, expr2) <- parseW
-  return $ second
-    (\ e -> ExprTernaryIf $ TernaryIf e ws1 ws2 expr1 ws3 ws4 expr2)
+  w2 <- tokQMarkP >> parse
+  (e2, w3) <- parseW
+  w4 <- tokColonP >> parse
+  (e3, w5) <- parseW
+  return $ \ (e1, w1) ->
+    (ExprTernaryIf $ TernaryIf e1 (w1, w2) e2 (w3, w4) e3, w5)
 
-eptXBy = do
-  (ws1, constr) <-
-    second (const ExprAssign)   <$> tokEq tokEquals   <|>
-    second (const ExprPlusBy)   <$> tokEq tokPlusBy   <|>
-    second (const ExprMinusBy)  <$> tokEq tokMinusBy  <|>
-    second (const ExprMulBy)    <$> tokEq tokMulBy    <|>
-    second (const ExprDivBy)    <$> tokEq tokDivBy    <|>
-    second (const ExprConcatBy) <$> tokEq tokConcatBy <|>
-    second (const ExprModBy)    <$> tokEq tokModBy    <|>
-    second (const ExprBitAndBy) <$> tokEq tokBitAndBy <|>
-    second (const ExprBitOrBy)  <$> tokEq tokBitOrBy  <|>
-    second (const ExprBitXorBy) <$> tokEq tokBitXorBy <|>
-    second (const ExprShiftLBy) <$> tokEq tokShiftLBy <|>
-    second (const ExprShiftRBy) <$> tokEq tokShiftRBy
-  return $ \ (wsPre, e1) (ws2, e2) -> (wsPre, constr e1 ws1 ws2 e2)
+eptAndWd = binOp BAndWd tokAndWdP
+eptXorWd = binOp BXorWd tokXorWdP
+eptOrWd  = binOp BOrWd  tokOrWdP
 
-eptPrint = wsAfter ExprPrint tokPrint
-eptAndWd = wsInfix ExprAndWd tokAndWd
-eptXorWd = wsInfix ExprXorWd tokXorWd
-eptOrWd  = wsInfix ExprOrWd  tokOrWd
--}
-
-
-{-
-funcLike1Parser :: (WS -> WS -> Expr -> WS -> Expr) ->
-  Parsec [TokWS] () (WS, a) -> Parsec [TokWS] () (WS, Expr)
-funcLike1Parser constr p = do
-  (wsPre, _) <- p
-  (ws1, _) <- tokEq tokLParen
-  (ws2, expr) <- parseW
-  (ws3, _) <- tokEq tokRParen
-  return (wsPre, constr ws1 ws2 expr ws3)
-
-funcLikeNParser :: (WS -> WS -> Expr -> WS -> Expr) ->
-  Parsec [TokWS] () (WS, a) -> Parsec [TokWS] () (WS, Expr)
-funcLikeNParser constr p = do
-  (wsPre, _) <- p
-  (ws1, _) <- tokEq tokLParen
-  (ws2, expr) <- parseW
-  (ws3, _) <- tokEq tokRParen
-  return (wsPre, constr ws1 ws2 expr ws3)
-
-varValParser :: Parsec [TokWS] () (WS, a) -> Parsec [TokWS] () (WS, VarVal a)
-varValParser p = do
-  (wsPre, var) <- p
-  (ws1, _) <- tokEq tokEquals
-  (ws2, val) <- parseW
-  return (wsPre, VarVal var ws1 ws2 val)
-
-instance ParseW VarMbVal where
-  parseW = do
-    (wsPre, var) <- parseW
-    val <- optionMaybe $ do
-      (ws1, _) <- tokEq tokEquals
-      (ws2, expr) <- parseW
-      return (ws1, ws2, expr)
-    return (wsPre, VarMbVal var val)
-
-preRep, postRep :: Parsec [TokWS] () ((WS, a) -> (WS, a)) ->
-  Parsec [TokWS] () ((WS, a) -> (WS, a))
-preRep  fParse = (fParse >>= \ f -> (f .) <$> preRep  fParse) <|> return id
-postRep fParse = (fParse >>= \ f -> (. f) <$> postRep fParse) <|> return id
-
-
-wsBefore :: (a -> WS -> a) -> Tok ->
-  Parsec [TokWS] () ((WS, a) -> (WS, a))
-wsBefore constr tok = do
-  (ws1, _) <- tokEqNoCase tok
-  return . second $ flip constr ws1
-
-wsInfix :: (a -> WS -> WS -> a -> a) -> Tok ->
-  Parsec [TokWS] () ((WS, a) -> (WS, a) -> (WS, a))
-wsInfix  constr tok = do
-  (ws1, _) <- tokEqNoCase tok
-  return $ \ (wsPre, e1) (ws2, e2) -> (wsPre, constr e1 ws1 ws2 e2)
-
-ial, ian :: [Parsec [TokWS] u (a -> a -> a)] ->
-  [Operator [TokWS] u Identity a]
-ial = fAll $ flip Infix AssocLeft
-ian = fAll $ flip Infix AssocNone
-
-eptFuncCall = do
-  (ws1, args) <- argListParser parseW
-  return . second $ \ e -> ExprFuncCall e ws1 args
-
-funcArgParser :: Parsec [TokWS] ()
-  (WS, (Maybe (Maybe Const, WS), Maybe WS, Var, Maybe (WS, WS, Expr)))
-funcArgParser = do
-  constMb <- optionMaybe $
-    second Just <$> parseW <|>
-    second (const Nothing) <$> tokEqNoCase tokArray
-  refWs <- optionMaybe $ fst <$> tokEq tokRef
-  (wsPre, var) <- parseW
-  mbWs1Ws2Expr <- optionMaybe $ do
-    (ws1, _) <- tokEq tokEquals
-    (ws2, expr) <- parseW
-    return (ws1, ws2, expr)
-  let
-    (wsPre', const') = case constMb of
-      Nothing -> (wsPre, Nothing)
-      Just (ws, const) -> (ws, Just (const, wsPre))
-  return (wsPre', (const', refWs, var, mbWs1Ws2Expr))
-
-funcArgIfy ::
-  WSCap (Maybe (Maybe Const, WS), Maybe WS, Var, Maybe (WS, WS, Expr)) ->
-  FuncArg
-funcArgIfy (WSCap wsA1 (const, refWs, var, mb) wsA2) =
-  FuncArg wsA1 const refWs var mb wsA2
-
--}

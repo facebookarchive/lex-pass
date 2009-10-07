@@ -1,19 +1,17 @@
 module LexPassUtil where
 
+import Common
 import Control.Applicative
 import Control.Arrow
 import Control.Monad.State
-import Data.Ast
 import Data.Binary
-import Data.Generics
-import Data.Tok
+import Data.Data
 import FUtil
 import HSH
 import System.Directory
 import System.FilePath
 import System.IO
 import System.Process
-import Text.Parsec hiding (State)
 import qualified Data.Intercal as IC
 
 --

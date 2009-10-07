@@ -38,3 +38,4 @@ modAllStmts f = modIntercal $ \ wsPre s wsPost -> case f wsPre s wsPost of
     doBlock (Block stmtList) = Block <$> modAllStmts f stmtList
     doCase x = (\ a -> x {caseStmtList = a}) <$> modAllStmts f (caseStmtList x)
     single x = IC.singleton wsPre x wsPost
+

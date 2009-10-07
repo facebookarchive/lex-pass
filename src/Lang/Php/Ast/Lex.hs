@@ -19,13 +19,13 @@ instance ParseW StrLit where  -- i want Parse -> ParseW  :(
 instance Unparse StrLit where
   unparse (StrLit a) = a
 
-strLitRestParser :: Char -> Parsec String () String
+strLitRestParser :: Char -> Parser String
 strLitRestParser end = anyChar >>= \ c -> (c:) <$>
   if c == end then return [] else if c == '\\'
     then liftM2 (:) anyChar (strLitRestParser end)
     else strLitRestParser end
 
-backticksParser :: Parsec String () String
+backticksParser :: Parser String
 backticksParser = liftM2 (:) (char '`') (strLitRestParser '`')
 
 data NumLit = NumLit String
@@ -56,24 +56,24 @@ instance Parse HereDoc where
 instance Unparse HereDoc where
   unparse (HereDoc a) = a
 
-hereDocRestParser :: String -> Parsec String () String
+hereDocRestParser :: String -> Parser String
 hereDocRestParser s =
   try (string $ s ++ ";") <|>
   liftM2 (++) lineParser (hereDocRestParser s)
 
-lineParser :: Parsec String () String
+lineParser :: Parser String
 lineParser = liftM2 (++) (many $ satisfy (/= '\n')) ((:[]) <$> newline)
 
-genIdentifierParser :: Parsec String () String
+genIdentifierParser :: Parser String
 genIdentifierParser = liftM2 (:)
   (satisfy (`elem` ['a'..'z'] ++ ['A'..'Z'] ++ ['_']))
   genIdentifierRestParser
 
-genIdentifierRestParser :: Parsec String () String
+genIdentifierRestParser :: Parser String
 genIdentifierRestParser = many $
   satisfy (`elem` ['a'..'z'] ++ ['A'..'Z'] ++ ['_'] ++ ['0'..'9'])
 
-identifierParser :: Parsec String () String
+identifierParser :: Parser String
 identifierParser = try $ do
   i <- genIdentifierParser
   when (i `Set.member` reservedWords) $
@@ -81,117 +81,111 @@ identifierParser = try $ do
   return i
 
 -- must be given lowercase
-charCI :: Char -> Parsec String () Char
+charCI :: Char -> Parser Char
 charCI c = satisfy ((== c) . toLower)
 
 -- must be given lowercase
-stringCI :: String -> Parsec String () String
+stringCI :: String -> Parser String
 stringCI = mapM charCI
 
-tokAbstract = "abstract"
+tokNot = "!"
+tokNE = "!="
+tokNI = "!=="
+tokDollar = "$"
+tokMod = "%"
+tokModBy = "%="
+tokAmp = "&"
 tokAnd = "&&"
+tokBitAndBy = "&="
+tokLParen = "("
+tokRParen = ")"
+tokMul = "*"
+tokMulBy = "*="
+tokPlus = "+"
+tokIncr = "++"
+tokPlusBy = "+="
+tokComma = ","
+tokMinus = "-"
+tokDecr = "--"
+tokMinusBy = "-="
+tokArrow = "->"
+tokConcat = "."
+tokConcatBy = ".="
+tokDiv = "/"
+tokDivBy = "/="
+tokColon = ":"
+tokDubColon = "::"
+tokLT = "<"
+tokShiftL = "<<"
+tokShiftLBy = "<<="
+tokLE = "<="
+tokNEOld = "<>"
+tokEquals = "="
+tokEQ = "=="
+tokID = "==="
+tokDubArrow = "=>"
+tokGT = ">"
+tokGE = ">="
+tokShiftR = ">>"
+tokShiftRBy = ">>="
+tokQMark = "?"
+tokAt = "@"
+tokLBracket = "["
+tokRBracket = "]"
+tokXor = "^"
+tokXorBy = "^="
+tokAbstract = "abstract"
 tokAndWd = "and"
 tokArray = "array"
-tokArrow = "->"
 tokAs = "as"
-tokAt = "@"
-tokBitAnd = "&"
-tokBitAndBy = "&="
-tokBitNot = "~"
-tokBitOr = "|"
-tokBitOrBy = "|="
 tokBreak = "break"
 tokCase = "case"
 tokCatch = "catch"
 tokClass = "class"
 tokClone = "clone"
-tokColon = ":"
-tokComma = ","
-tokConcat = "."
-tokConcatBy = ".="
 tokConst = "const"
 tokContinue = "continue"
 tokDeclare = "declare"
-tokDecr = "--"
 tokDefault = "default"
 tokDie = "die"
-tokDiv = "/"
-tokDivBy = "/="
 tokDo = "do"
-tokDollar = "$"
-tokDubArrow = "=>"
-tokDubColon = "::"
 tokEcho = "echo"
 tokElse = "else"
 tokElseif = "elseif"
 tokEmpty = "empty"
 tokEnddeclare = "enddeclare"
-tokEndforeach = "endforeach"
 tokEndfor = "endfor"
+tokEndforeach = "endforeach"
 tokEndif = "endif"
 tokEndswitch = "endswitch"
 tokEndwhile = "endwhile"
-tokEQ = "=="
-tokEquals = "="
 tokEval = "eval"
 tokExit = "exit"
 tokExtends = "extends"
 tokFinal = "final"
-tokForeach = "foreach"
 tokFor = "for"
+tokForeach = "foreach"
 tokFunction = "function"
-tokGE = ">="
 tokGlobal = "global"
 tokGoto = "goto"
-tokGT = ">"
-tokID = "==="
 tokIf = "if"
 tokImplements = "implements"
 tokInclude = "include"
 tokIncludeOnce = "include_once"
-tokIncr = "++"
 tokInstanceof = "instanceof"
 tokInterface = "interface"
 tokIsset = "isset"
-tokLBrace = "("
-tokLBracket = "["
-tokLE = "<="
 tokList = "list"
-tokLParen = "("
-tokLT = "<"
-tokMinus = "-"
-tokMinusBy = "-="
-tokMod = "%"
-tokModBy = "%="
-tokMul = "*"
-tokMulBy = "*="
 tokNamespace = "namespace"
-tokNE = "!="
-tokNegate = "-"
-tokNEOld = "<>"
 tokNew = "new"
-tokNI = "!=="
-tokNot = "!"
-tokOr = "||"
 tokOrWd = "or"
-tokPlus = "+"
-tokPlusBy = "+="
 tokPrint = "print"
 tokPrivate = "private"
 tokProtected = "protected"
 tokPublic = "public"
-tokQMark = "?"
-tokRBrace = ")"
-tokRBracket = "]"
-tokRef = "&"
-tokRequireOnce = "require_once"
 tokRequire = "require"
+tokRequireOnce = "require_once"
 tokReturn = "return"
-tokRParen = ")"
-tokShiftL = "<<"
-tokShiftLBy = "<<="
-tokShiftR = ">>"
-tokShiftRBy = ">>="
 tokStatic = "static"
 tokSwitch = "switch"
 tokThrow = "throw"
@@ -200,9 +194,13 @@ tokUnset = "unset"
 tokUse = "use"
 tokVar = "var"
 tokWhile = "while"
-tokXor = "^"
-tokXorBy = "^="
 tokXorWd = "xor"
+tokLBrace = "{"
+tokBitOr = "|"
+tokBitOrBy = "|="
+tokOr = "||"
+tokRBrace = "}"
+tokBitNot = "~"
 
 reservedWords :: Set.Set String
 reservedWords = Set.fromList [
@@ -270,7 +268,7 @@ reservedWords = Set.fromList [
 
 -- idk why but we need an explicit specialized type instead of using (string)
 -- directly
-s :: String -> Parsec String () String
+s :: String -> Parser String
 s = string
 
 identCI w = try $ do
@@ -284,6 +282,7 @@ identsCI w = try $ do
   return i
 
 tokAbstractP = identCI tokAbstract
+tokAmpP = s tokAmp
 tokAndP = s tokAnd
 tokAndWdP = identCI tokAndWd
 tokArrayP = identCI tokArray
@@ -291,7 +290,6 @@ tokArrowP = s tokArrow
 tokAsP = identCI tokAs
 tokAtP = s tokAt
 tokBitAndByP = s tokBitAndBy
-tokBitAndP = s tokBitAnd
 tokBitNotP = s tokBitNot
 tokBitOrByP = s tokBitOrBy
 tokBitOrP = s tokBitOr
@@ -357,7 +355,6 @@ tokModP = s tokMod
 tokMulByP = s tokMulBy
 tokMulP = s tokMul
 tokNamespaceP = identCI tokNamespace
-tokNegateP = s tokNegate
 tokNEOldP = s tokNEOld
 tokNEP = s tokNE
 tokNewP = s tokNew
@@ -374,7 +371,6 @@ tokPublicP = identCI tokPublic
 tokQMarkP = s tokQMark
 tokRBraceP = s tokRBrace
 tokRBracketP = s tokRBracket
-tokRefP = s tokRef
 tokReturnP = identCI tokReturn
 tokRParenP = s tokRParen
 tokShiftLByP = s tokShiftLBy

@@ -2,7 +2,6 @@
 set -e
 echo 'Running codegen...'
 cd src
-./codegen
+./codegen-bin
 cd ..
 cabal install --enable-optimization=2 --global --root-cmd=sudo
-sudo cp src/php_lex_stdin /usr/local/bin
