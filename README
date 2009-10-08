@@ -18,7 +18,7 @@ to use
     changes work
 - to write a new transformer
   - see src/Transf/ for examples
-  - src/codegen (which is run by ./install) automatically detects new
+  - src/do-codegen (which is run by ./install) automatically detects new
     transformers in src/Transf/
 - if you are using git you may want to use a separate repo instead of just a
   branch in an existing repo.  files have mtime updated by branch-switching,

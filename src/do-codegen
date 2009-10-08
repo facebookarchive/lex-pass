@@ -11,7 +11,7 @@ import System.Directory
 
 doDir :: FilePath -> IO ([String], [String])
 doDir dir = do
-  files <- map (reversify $ drop 3) .  filter (".hs" `isSuffixOf`) <$>
+  files <- map (reversify $ drop 3) . filter (".hs" `isSuffixOf`) <$>
     getDirectoryContents dir
   return (
     map (\ f -> "import qualified " ++ dir ++ "." ++ f) files,
