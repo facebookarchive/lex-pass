@@ -1,3 +1,5 @@
+Mailing list at: http://groups.google.com/group/lex-pass
+
 lex-pass allows you to automate changes to a php codebase, by writing
 abstract-syntax-tree transformers in haskell.  haskell is good because it is
 well-suited for language manipulation and because it has good parsing libraries
@@ -23,9 +25,6 @@ to use
 - if you are using git you may want to use a separate repo instead of just a
   branch in an existing repo.  files have mtime updated by branch-switching,
   so there will be some unnecessary re-parsing.
-
-to get help
-- lex-pass@lists.facebook.com
 
 notes for those hacking on lex-pass itself
 - todo

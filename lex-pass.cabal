@@ -2,7 +2,7 @@ name:           lex-pass
 version:        2.0
 license:        BSD3
 license-file:   LICENSE
-author:         lex-pass@lists.facebook.com
+author:         http://groups.google.com/group/lex-pass
 synopsis:       perform lexically-aware transformational passes over a
                 codebase, limiting number of files changed per run to try to
                 minimize conflicts in a rapidly changing development
