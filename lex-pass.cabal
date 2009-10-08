@@ -7,8 +7,8 @@ synopsis:       perform lexically-aware transformational passes over a
                 codebase, limiting number of files changed per run to try to
                 minimize conflicts in a rapidly changing development
                 environment
-build-depends:  FUtil, HSH, base, directory, parsec, filepath, process, mtl,
-                binary, derive
+build-depends:  FUtil, HSH >= 2, base, binary, derive, directory, filepath,
+                mtl, parsec, process
 build-type:     Simple
 Cabal-Version:  >= 1.2
 
