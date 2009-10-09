@@ -91,7 +91,7 @@ sourceFiles dir onlyChanged = do
   let
     cmd = if onlyChanged
       then error "not working right now" --"git-files-modified"
-      else "fbf -fpt *"
+      else "find -iname '*.php'"
   ls <- inCd dir $ run cmd
   return ls
 

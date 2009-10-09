@@ -168,7 +168,7 @@ onReadToks codeDir subPath f = f =<< readToks codeDir subPath
 
 readToks :: FilePath -> FilePath -> IO [Tok]
 readToks codeDir subPath = fmap (map tokParseKillPos . lines) . run $
-  catFromBS [codeDir </> subPath] -|- "php_lex_stdin"
+  catFrom [codeDir </> subPath] -|- "php_lex_stdin"
 
 transfModsFile :: Parsec s (Bool, b) ()
 transfModsFile = updateState ((,) True . snd)

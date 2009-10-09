@@ -13,7 +13,7 @@ module Lang.Php.Ast.Common (
   module Data.Maybe,
   module FUtil,
   Parse(..), ParseW(..), Unparse(..),
-  WS(..), WS2, WSCap(..), capify, wsNoNLParser) where
+  InterWS, WS(..), WS2, WSCap(..), capify, wsNoNLParser) where
 
 import Common
 import Control.Applicative hiding ((<|>), many, optional, Const)
@@ -26,6 +26,7 @@ import Data.DeriveTH
 import Data.List
 import Data.Maybe
 import FUtil
+import qualified Data.Intercal as IC
 
 class Parse a where
   parse :: Parser a
@@ -74,6 +75,8 @@ instance (Unparse a) => Unparse (WSCap a) where
 
 capify :: WS -> (a, WS) -> WSCap a
 capify a (b, c) = WSCap a b c
+
+type InterWS s = IC.Intercal WS s
 
 $(derive makeBinary ''WS)
 $(derive makeBinary ''WSCap)

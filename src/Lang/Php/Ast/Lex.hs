@@ -46,19 +46,18 @@ data HereDoc = HereDoc String
 
 instance Parse HereDoc where
   parse = HereDoc <$> do
-    pre <- string "<<<"
-    WS ws <- wsNoNLParser
+    WS ws <- tokHereDocP >> wsNoNLParser
     s <- genIdentifierParser
     nl <- newline
     rest <- hereDocRestParser s
-    return (pre ++ ws ++ s ++ [nl] ++ rest)
+    return (ws ++ s ++ [nl] ++ rest)
 
 instance Unparse HereDoc where
-  unparse (HereDoc a) = a
+  unparse (HereDoc a) = tokHereDoc ++ a
 
 hereDocRestParser :: String -> Parser String
 hereDocRestParser s =
-  try (string $ s ++ ";") <|>
+  try (string $ s ++ tokSemi) <|>
   liftM2 (++) lineParser (hereDocRestParser s)
 
 lineParser :: Parser String
@@ -115,8 +114,10 @@ tokDiv = "/"
 tokDivBy = "/="
 tokColon = ":"
 tokDubColon = "::"
+tokSemi = ";"
 tokLT = "<"
 tokShiftL = "<<"
+tokHereDoc = "<<<"
 tokShiftLBy = "<<="
 tokLE = "<="
 tokNEOld = "<>"
@@ -335,6 +336,7 @@ tokGEP = s tokGE
 tokGlobalP = identCI tokGlobal
 tokGotoP = identCI tokGoto
 tokGTP = s tokGT
+tokHereDocP = s tokHereDoc
 tokIDP = s tokID
 tokIfP = identCI tokIf
 tokImplementsP = identCI tokImplements
@@ -373,6 +375,7 @@ tokRBraceP = s tokRBrace
 tokRBracketP = s tokRBracket
 tokReturnP = identCI tokReturn
 tokRParenP = s tokRParen
+tokSemiP = s tokSemi
 tokShiftLByP = s tokShiftLBy
 tokShiftLP = s tokShiftL
 tokShiftRByP = s tokShiftRBy

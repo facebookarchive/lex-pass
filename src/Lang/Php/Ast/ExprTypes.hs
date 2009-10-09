@@ -6,21 +6,20 @@ import Lang.Php.Ast.Common
 import Lang.Php.Ast.Lex
 import qualified Data.Intercal as IC
 
--- Val's are defined to only contain: "$", identifiers, "[Expr]", "[]", "()",
--- "${Expr}", "::", "->".  The most important consideration is which ones
--- can be assigned to (LVal's) and which ones can be assigned from (RVal's).
--- In PHP, most but not all LVal's are also RVal's.
+-- Val's are defined to only contain: "$", identifiers, "[Expr]", "[]",
+-- "(Exprs)", "${Expr}", "::", "->".  The most important consideration is which
+-- ones can be assigned to (LVal's) and which ones can be assigned from
+-- (RVal's).  In PHP, most but not all LVal's are also RVal's.
 
 -- Note that this grammar allows "$$a[]->a = 5;" but Zend does not.  However,
 -- Zend allows "${$a}[]->a = 5;", and it's not clear what is gained by treating
--- $a and ${..} asymmetrically here.  Php also allows "${$a}[0]->a = 5" and
--- "$$a[0]->a = 5;".  So we're regarding this as a theoretically-pointless
--- limitation that is a by-product of the Zend implementation.  In particular,
--- we think they simplify their job by slurping all [Expr?]'s onto Var's and
--- only later analyze things with regard to LVal considerations, simply
--- fataling if something is then arwy.
+-- $a and ${..} asymmetrically here.  PHP also allows "${$a}[0]->a = 5" and
+-- "$$a[0]->a = 5;".  So we're regarding this as a by-product of the Zend
+-- implementation.  In particular, we think they simplify their job by slurping
+-- all [Expr?]'s onto Var's and only later analyze things with regard to LVal
+-- considerations, simply fataling if something is then arwy.
 --
--- I think modeling that nuance is impractical in the clear division of
+-- Modeling that nuance is impractical under the clear division of
 -- Var's, LVal's, and RVal's that we desire to make the AST nice for
 -- refactoring.
 
@@ -72,7 +71,7 @@ data Expr =
   ExprAssign    (Maybe BinOpBy) LVal WS2 Expr |
   ExprBackticks String |
   ExprBinOp     BinOp Expr WS2 Expr |
-  -- i'm lazy so just String here instead of like PhpType (fixme?)
+  -- we're lazy so just String here instead of like PhpType
   ExprCast      (WSCap String) WS Expr |
   ExprEmpty     WS (WSCap Var) |
   ExprEval      WS (WSCap Expr) |
@@ -86,18 +85,13 @@ data Expr =
     (Maybe (WS, Either WS [WSCap Expr])) |
   ExprNumLit    NumLit |
   ExprParen     (WSCap Expr) |
+  ExprPostOp    PostOp Expr WS |
   ExprPreOp     PreOp WS Expr |
-  ExprPreIncr   IncrOrDecr WS Var |
-  ExprPostIncr  IncrOrDecr Var WS |
-  -- "&" is actually more limited ("list() = &$a;" is nonsyntactic)
-  -- but this is good enough
+  -- note: "list"/"&" is actually more limited ("list() = &$a;" is nonsyntactic)
   ExprRef       WS Var |
   ExprRVal      RVal |
   ExprStrLit    StrLit |
   ExprTernaryIf TernaryIf
-  deriving (Eq, Show, Typeable, Data)
-
-data IncrOrDecr = Incr | Decr
   deriving (Eq, Show, Typeable, Data)
 
 data BinOp = BAnd | BAndWd | BEQ | BGE | BGT | BID | BLE | BLT | BNE |
@@ -110,7 +104,10 @@ data BinOpBy = BBitAnd | BBitOr | BConcat | BDiv | BMinus | BMod | BMul |
   deriving (Eq, Show, Typeable, Data)
 
 data PreOp = PrPrint | PrAt | PrBitNot | PrClone | PrNegate | PrNot | PrPos |
-  PrSuppress
+  PrSuppress | PrIncr | PrDecr
+  deriving (Eq, Show, Typeable, Data)
+
+data PostOp = PoIncr | PoDecr
   deriving (Eq, Show, Typeable, Data)
 
 data IncOrReq = Inc | Req
@@ -120,7 +117,7 @@ data OnceOrNot = Once | NotOnce
   deriving (Eq, Show, Typeable, Data)
 
 data TernaryIf = TernaryIf {
-  ternaryIfTest :: Expr,
+  ternaryIfCond :: Expr,
   ternaryIfWS1  :: WS2,
   ternaryIfThen :: Expr,
   ternaryIfWS2  :: WS2,
@@ -137,11 +134,11 @@ $(derive makeBinary ''DubArrowMb)
 $(derive makeBinary ''DynConst)
 $(derive makeBinary ''Expr)
 $(derive makeBinary ''IncOrReq)
-$(derive makeBinary ''IncrOrDecr)
 $(derive makeBinary ''LOnlyVal)
 $(derive makeBinary ''LRVal)
 $(derive makeBinary ''LVal)
 $(derive makeBinary ''OnceOrNot)
+$(derive makeBinary ''PostOp)
 $(derive makeBinary ''PreOp)
 $(derive makeBinary ''ROnlyVal)
 $(derive makeBinary ''RVal)
