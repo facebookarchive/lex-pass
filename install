@@ -5,3 +5,4 @@ cd src
 ./do-codegen
 cd ..
 cabal install --enable-optimization=2 --global --root-cmd=sudo
+sudo cp src/php_lex_stdin /usr/local/bin

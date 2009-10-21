@@ -1,17 +1,19 @@
 module LexPassUtil where
 
-import Common
 import Control.Applicative
 import Control.Arrow
 import Control.Monad.State
+import Data.Ast
 import Data.Binary
-import Data.Data
+import Data.Generics
+import Data.Tok
 import FUtil
 import HSH
 import System.Directory
 import System.FilePath
 import System.IO
 import System.Process
+import Text.Parsec hiding (State)
 import qualified Data.Intercal as IC
 
 --
@@ -199,6 +201,12 @@ parseAndCache codeDir subPath = do
 -- for testing
 --
 
+lexWhole :: String -> IO [Tok]
+lexWhole = fmap (map tokParseKillPos . lines) . runInp "lex_stdin"
+
+lexFragment :: String -> IO [Tok]
+lexFragment = fmap (drop 1) . lexWhole . ("<?php\n" ++)
+
 runInp :: String -> String -> IO String
 runInp cmd inp = do
   (pIn, pOut, pErr, pH) <- runInteractiveCommand cmd
@@ -206,6 +214,41 @@ runInp cmd inp = do
   hClose pIn
   waitForProcess pH
   hGetContents pOut
+
+{-
+absorbWs :: [Tok] -> InterWS Tok
+absorbWs toks = if null rest
+  then IC.Interend ws
+  else IC.Intercal ws rest1 $ absorbWs restRest
+  where
+  (ws, rest) = span ((`elem` wsTokTypes) . tokGetType) toks
+  rest1:restRest = rest
+
+showFragment :: (Show a) => String -> Parsec [TokWS] () a -> String -> IO ()
+showFragment name p s = do
+  toks <- lexFragment s
+  case runParser p () name . fst . IC.breakEnd $ absorbWs toks of
+    Left err -> do
+      print err
+      putStrLn "on tok stream:"
+      mapM_ print toks
+    Right res -> print res
+
+showWhole :: String -> String -> IO ()
+showWhole name contents = do
+  toks <- lexWhole contents
+  case parseAst name toks of
+    Left err -> do
+      print err
+      putStrLn "on tok stream:"
+      mapM_ print toks
+    Right res -> print res
+
+showFile :: String -> IO ()
+showFile name = do
+  home <- getHomeDirectory
+  showWhole name =<< readFileStrict (home </> "www" </> name)
+-}
 
 --
 -- eof

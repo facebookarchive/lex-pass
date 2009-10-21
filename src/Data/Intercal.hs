@@ -2,14 +2,14 @@
 
 module Data.Intercal where
 
-import Common
 import Control.Arrow
 import Control.Applicative
-import Control.Monad
+import Control.Monad hiding (mapM)
 import Data.Binary
-import Data.Data
-import Prelude hiding (concatMap, map)
+import Data.Generics
+import Prelude hiding (concatMap, map, mapM)
 import qualified Prelude
+import Text.Parsec
 
 data Intercal a b = Intercal a b (Intercal a b) | Interend a
   deriving (Eq, Show, Typeable, Data)
@@ -25,7 +25,8 @@ instance (Binary a, Binary b) => Binary (Intercal a b) where
       0 -> liftM3 Intercal get get get
       1 -> liftM  Interend get
 
-intercalParser :: Parser a -> Parser b -> Parser (Intercal a b)
+intercalParser :: Parsec [t] () a -> Parsec [t] () b ->
+  Parsec [t] () (Intercal a b)
 intercalParser a b = do
   aRes <- a
   bResMb <- optionMaybe b
