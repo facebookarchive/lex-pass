@@ -1,8 +1,10 @@
 module Lang.Php.Transf where
 
 import Control.Applicative
-import Data.Ast
 import Lang.Php.Ast
+import Lang.Php.Ast.Common
+import Lang.Php.Ast.Stmt
+import Lang.Php.Ast.StmtTypes
 import LexPassUtil
 import qualified Data.Intercal as IC
 
@@ -15,8 +17,9 @@ modAllStmts f = modIntercal $ \ wsPre s wsPost -> case f wsPre s wsPost of
   (Transformed {infoLines = ls}) -> single <$> t' where
     t' = t {infoLines = ls ++ infoLines t}
     t = case s of
-      StmtDoWhile (x@DoWhile {doWhileBlock = Right block}) ->
-        (\ a -> StmtDoWhile $ x {doWhileBlock = Right a}) <$> doBlock block
+      StmtDoWhile (x@DoWhile {doWhileBlock = WSCap w1 (Right block) w2}) ->
+        (\ a -> StmtDoWhile $ x {doWhileBlock = WSCap w1 (Right a) w2}) <$>
+        doBlock block
       StmtFuncDef x ->
         (\ a -> StmtFuncDef $ x {funcBlock = a}) <$> doBlock (funcBlock x)
       StmtFor (x@(For {forBlock = Right block})) -> StmtFor .
@@ -29,8 +32,8 @@ modAllStmts f = modIntercal $ \ wsPre s wsPost -> case f wsPre s wsPost of
         ifery (x@(IfBlock {ifBlockBlock = Right block})) =
           (\ a -> x {ifBlockBlock = Right a}) <$> doBlock block
         ifery other = pure other
-        elsery (Just (ws1, ws2, Right block)) =
-          (\ a -> Just (ws1, ws2, Right a)) <$> doBlock block
+        elsery (Just (ws, Right block)) =
+          (\ a -> Just (ws, Right a)) <$> doBlock block
         elsery other = pure other
       StmtSwitch x -> StmtSwitch . (\ a -> x {switchCases = a}) <$>
         modMap doCase (switchCases x)
@@ -38,3 +41,23 @@ modAllStmts f = modIntercal $ \ wsPre s wsPost -> case f wsPre s wsPost of
     doBlock (Block stmtList) = Block <$> modAllStmts f stmtList
     doCase x = (\ a -> x {caseStmtList = a}) <$> modAllStmts f (caseStmtList x)
     single x = IC.singleton wsPre x wsPost
+
+lastIndent :: WS -> WS2
+lastIndent [] = ([], [])
+lastIndent ws = case wsTail of
+  WS s ->
+    (wsInit ++ wsTokLIfNotNull sMost, wsTokLIfNotNull sAfterLastLine)
+    where
+    (sMost, sAfterLastLine) = reversifyTup (span (/= '\n')) s
+    wsTokLIfNotNull [] = []
+    wsTokLIfNotNull x  = [WS x]
+  _ -> (ws, [])
+  where
+  (wsTail:wsInitRev) = reverse ws
+  wsInit = reverse wsInitRev
+
+lastLine :: WS -> WS
+lastLine ws = case lastIndent ws of
+  (_, [WS s]) -> [WS $ '\n':s]
+  _ -> [WS "\n"]
+

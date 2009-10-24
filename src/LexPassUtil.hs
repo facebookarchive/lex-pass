@@ -1,19 +1,19 @@
 module LexPassUtil where
 
+import Common
 import Control.Applicative
 import Control.Arrow
 import Control.Monad.State
-import Data.Ast
 import Data.Binary
+import Data.Data
 import Data.Generics
-import Data.Tok
 import FUtil
 import HSH
+import Lang.Php.Ast
 import System.Directory
 import System.FilePath
 import System.IO
 import System.Process
-import Text.Parsec hiding (State)
 import qualified Data.Intercal as IC
 
 --
@@ -22,8 +22,9 @@ import qualified Data.Intercal as IC
 
 data Transf = Transf {
   transfName :: String,
-  transfArgs :: String,
+  transfTypes :: [String],
   transfDoc :: String,
+  transfArgs :: String,
   transfFunc :: [String] -> FilePath -> FilePath -> Int -> Int ->
     CanErrStrIO (Bool, [String])
   }
@@ -43,15 +44,19 @@ instance Applicative Transformed where
     infoLines    = infoLines f ++ infoLines t,
     transfResult = transfResult f <*> transfResult t}
 
-(-?-) :: String -> String -> (String, String)
-name -?- doc = (name, doc)
+(-:-) :: String -> [String] -> (String, [String])
+name -:- ftypes = (name, ftypes)
 
-(-=-) :: (String, String) -> ([String] -> FilePath -> FilePath -> Int -> Int ->
-  CanErrStrIO (Bool, [String])) -> Transf
-(name, doc) -=- func = Transf {
+(-?-) :: (String, [String]) -> String -> (String, [String], String)
+(name, ftypes) -?- doc = (name, ftypes, doc)
+
+(-=-) :: (String, [String], String) -> ([String] -> FilePath -> FilePath ->
+  Int -> Int -> CanErrStrIO (Bool, [String])) -> Transf
+(name, ftypes, doc) -=- func = Transf {
   transfName = bareName,
-  transfArgs = argInfo,
+  transfTypes = ftypes,
   transfDoc = doc,
+  transfArgs = argInfo,  -- unused currently
   transfFunc = func
   } where (bareName, argInfo) = break (== ' ') name
 
@@ -60,7 +65,7 @@ argless :: (t -> t1 -> t2) -> [a] -> t -> t1 -> t2
 argless f args dir subPath = if null args then f dir subPath
   else error "Expected no arguments."
 
-lexPass :: (StmtLike s) => (InterWS s -> Transformed (InterWS s)) ->
+lexPass :: (Binary a, Parse a, Unparse a) => (a -> Transformed a) ->
   FilePath -> FilePath -> Int -> Int -> CanErrStrIO (Bool, [String])
 lexPass transf codeDir subPath total cur = do
   io . hPutStrLn stderr $ "Checking (" ++ show cur ++ "/" ++ show total ++
@@ -71,8 +76,7 @@ lexPass transf codeDir subPath total cur = do
       return (False, infoLines)
     Transformed {infoLines = infoLines, transfResult = Just ast'} -> io $ do
       hPutStrLn stderr "- Saving"
-      writeFile (codeDir </> subPath) . concat . map tokGetVal $
-        toToks ast'
+      writeFile (codeDir </> subPath) $ unparse ast'
       encodeFile (astPath codeDir subPath) ast'
       return (True, infoLines)
 
@@ -83,6 +87,7 @@ lexPass transf codeDir subPath total cur = do
 transfNothing :: Transformed a
 transfNothing = Transformed {infoLines = [], transfResult = Nothing}
 
+{-
 lastIndent :: WS -> (WS, WS)
 lastIndent [] = ([], [])
 lastIndent ws = case wsTail of
@@ -104,6 +109,7 @@ lastLine ws = case lastIndent ws of
 
 wsSp :: [Tok]
 wsSp = [wsTokOf " "]
+-}
 
 modIntercal :: (a -> b -> a -> Transformed (IC.Intercal a b)) ->
   IC.Intercal a b -> Transformed (IC.Intercal a b)
@@ -155,39 +161,25 @@ modAll f = stateToTransformer (everywhereM (mkM $ transformerToState f))
 -- (some of these might be removable after the 2.0 refactor)
 --
 
-tokParseKillPos :: String -> Tok
-tokParseKillPos l = Tok (head ps) . nlUnesc $ last ps where
-  ps = breaksN (== '\t') 3 l
-
-tokUnparseFakePos :: Tok -> String
-tokUnparseFakePos (Tok typ val) = intertabs [typ, "", "", nlEsc val]
-
 astPath :: FilePath -> FilePath -> FilePath
 astPath codeDir subPath = codeDir </> ".ast" </> subPath ++ ".ast"
 
-onReadToks :: FilePath -> FilePath -> ([Tok] -> IO a) -> IO a
-onReadToks codeDir subPath f = f =<< readToks codeDir subPath
-
-readToks :: FilePath -> FilePath -> IO [Tok]
-readToks codeDir subPath = fmap (map tokParseKillPos . lines) . run $
-  catFrom [codeDir </> subPath] -|- "php_lex_stdin"
-
-transfModsFile :: Parsec s (Bool, b) ()
 transfModsFile = updateState ((,) True . snd)
 
-parseAndCache :: (StmtLike s) => FilePath -> FilePath -> IO (InterWS s)
+-- combine these into AnAst?
+parseAndCache :: (Binary a, Parse a, Unparse a) => FilePath -> FilePath -> IO a
 parseAndCache codeDir subPath = do
   let
     astFilename = astPath codeDir subPath
     regen = do
-      io $ hPutStrLn stderr "- Parsing"
-      onReadToks codeDir subPath $ \ toks ->
-        case parseAst subPath toks of
-          Left err -> error $ show err
-          Right ast -> do
-            createDirectoryIfMissing True $ takeDirectory astFilename
-            encodeFile astFilename ast
-            return ast
+      hPutStrLn stderr "- Parsing"
+      c <- readFileStrict $ codeDir </> subPath
+      case runParser parse () subPath c of
+        Left err -> error $ show err
+        Right ast -> do
+          createDirectoryIfMissing True $ takeDirectory astFilename
+          encodeFile astFilename ast
+          return ast
   doesFileExist astFilename >>= \ r -> if r
     then do
       mtimeAst  <- getModificationTime astFilename
@@ -198,58 +190,6 @@ parseAndCache codeDir subPath = do
     else regen
 
 --
--- for testing
---
-
-lexWhole :: String -> IO [Tok]
-lexWhole = fmap (map tokParseKillPos . lines) . runInp "lex_stdin"
-
-lexFragment :: String -> IO [Tok]
-lexFragment = fmap (drop 1) . lexWhole . ("<?php\n" ++)
-
-runInp :: String -> String -> IO String
-runInp cmd inp = do
-  (pIn, pOut, pErr, pH) <- runInteractiveCommand cmd
-  hPutStr pIn inp
-  hClose pIn
-  waitForProcess pH
-  hGetContents pOut
-
-{-
-absorbWs :: [Tok] -> InterWS Tok
-absorbWs toks = if null rest
-  then IC.Interend ws
-  else IC.Intercal ws rest1 $ absorbWs restRest
-  where
-  (ws, rest) = span ((`elem` wsTokTypes) . tokGetType) toks
-  rest1:restRest = rest
-
-showFragment :: (Show a) => String -> Parsec [TokWS] () a -> String -> IO ()
-showFragment name p s = do
-  toks <- lexFragment s
-  case runParser p () name . fst . IC.breakEnd $ absorbWs toks of
-    Left err -> do
-      print err
-      putStrLn "on tok stream:"
-      mapM_ print toks
-    Right res -> print res
-
-showWhole :: String -> String -> IO ()
-showWhole name contents = do
-  toks <- lexWhole contents
-  case parseAst name toks of
-    Left err -> do
-      print err
-      putStrLn "on tok stream:"
-      mapM_ print toks
-    Right res -> print res
-
-showFile :: String -> IO ()
-showFile name = do
-  home <- getHomeDirectory
-  showWhole name =<< readFileStrict (home </> "www" </> name)
--}
-
---
 -- eof
 --
+

@@ -1,9 +1,11 @@
 module Lang.Php (
   module Lang.Php.Ast,
-  module Lang.Php.Tok,
-  module Lang.Php.Transf
+  module Lang.Php.Transf,
+  ftype
   ) where
 
 import Lang.Php.Ast
-import Lang.Php.Tok
 import Lang.Php.Transf
+
+ftype = ["php"]
+

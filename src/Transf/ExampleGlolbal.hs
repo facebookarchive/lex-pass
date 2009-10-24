@@ -6,7 +6,7 @@ import qualified Data.Intercal as IC
 
 transfs :: [Transf]
 transfs = [
-  "example-glolbal" -?-
+  "example-glolbal" -:- ftype -?-
   "lex-pass example.  Convert: \
   \\"global $x, $y;\" -> \"/* lol */\\nglobal $x, $y;\""
   -=- argless (lexPass lol)
@@ -14,9 +14,9 @@ transfs = [
 
 addLolsBeforeGlobals :: WS -> Stmt -> WS -> Transformed StmtList
 addLolsBeforeGlobals wsPre stmt@(StmtGlobal vars StmtEndSemi) wsPost = pure .
-  IC.Intercal (wsPre ++ [commentTokOf "/* lol */"] ++ lastLine wsPre) stmt $
+  IC.Intercal (wsPre ++ [Comment "/* lol */"] ++ lastLine wsPre) stmt $
   IC.Interend wsPost
 addLolsBeforeGlobals _ _ _ = transfNothing
 
-lol :: StmtList -> Transformed StmtList
-lol = modAllStmts addLolsBeforeGlobals
+lol :: Ast -> Transformed Ast
+lol = undefined --modAllStmts addLolsBeforeGlobals

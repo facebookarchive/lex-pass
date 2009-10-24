@@ -2,20 +2,20 @@
 
 module Data.Intercal where
 
+import Common
 import Control.Arrow
 import Control.Applicative
-import Control.Monad hiding (mapM)
+import Control.Monad
 import Data.Binary
-import Data.Generics
-import Prelude hiding (concatMap, map, mapM)
+import Data.Data
+import Prelude hiding (concatMap, map)
 import qualified Prelude
-import Text.Parsec
 
 data Intercal a b = Intercal a b (Intercal a b) | Interend a
   deriving (Eq, Show, Typeable, Data)
 
 -- we're using method that should be faster-but-bigger instead of storing
--- length.  is this the same as the derive one, should we just use that?
+-- length.  this is probably the same as the derive one, just use that?
 instance (Binary a, Binary b) => Binary (Intercal a b) where
   put (Intercal x y r) = put (0 :: Word8) >> put x >> put y >> put r
   put (Interend x)     = put (1 :: Word8) >> put x
@@ -25,14 +25,24 @@ instance (Binary a, Binary b) => Binary (Intercal a b) where
       0 -> liftM3 Intercal get get get
       1 -> liftM  Interend get
 
-intercalParser :: Parsec [t] () a -> Parsec [t] () b ->
-  Parsec [t] () (Intercal a b)
+intercalParser :: Parser a -> Parser b -> Parser (Intercal a b)
 intercalParser a b = do
   aRes <- a
   bResMb <- optionMaybe b
   case bResMb of
     Nothing -> return $ Interend aRes
     Just bRes -> liftM (Intercal aRes bRes) $ intercalParser a b
+
+instance (Parse a, Parse b) => Parse (Intercal a b) where
+  parse = intercalParser parse parse
+
+intercalUnparser :: (a -> String) -> (b -> String) -> Intercal a b -> String
+intercalUnparser f g i =
+  Prelude.concatMap (\ (a, b) -> f a ++ g b) xInit ++ f xEnd where
+  (xInit, xEnd) = breakEnd i
+
+instance (Unparse a, Unparse b) => Unparse (Intercal a b) where
+  unparse = intercalUnparser unparse unparse
 
 concatMapM :: (Monad m) => (a -> b -> a -> m (Intercal a b)) ->
   Intercal a b -> m (Intercal a b)
@@ -90,4 +100,8 @@ mapA f  g (Intercal x y rest) = liftA3 Intercal (f x) (g y) (mapA f g rest)
 -- singleton "in a"
 singleton :: a -> b -> a -> Intercal a b
 singleton a1 b a2 = Intercal a1 b $ Interend a2
+
+append :: a -> b -> Intercal b a -> Intercal b a
+append a b (Interend b0) = Intercal b0 a $ Interend b
+append a b (Intercal b0 a0 rest) = Intercal b0 a0 $ append a b rest
 

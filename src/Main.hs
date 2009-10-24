@@ -1,11 +1,9 @@
-import Lang.Php.Ast
 import Control.Monad
 import Control.Monad.Error
 import Data.Char
 import Data.List
+import Data.Maybe
 import FUtil
-import HSH
-import LexPassUtil
 import System.Console.GetOpt
 import System.Directory
 import System.Environment
@@ -14,14 +12,16 @@ import System.IO
 import System.Process
 
 import CodeGen.Transf
+import LexPassUtil
+import qualified Config
 
 data Options = Options {
   optFiles            :: Bool,
   optOnlyChangedFiles :: Bool,
   optMaxN             :: Maybe Int,
   optDir              :: Maybe String,
-  optStartAtFile      :: Maybe String
-  } deriving Show
+  optStartAtFile      :: Maybe String}
+  deriving Show
 
 defaultOptions :: Options
 defaultOptions = Options {
@@ -29,35 +29,33 @@ defaultOptions = Options {
   optOnlyChangedFiles = False,
   optMaxN             = Nothing,
   optDir              = Nothing,
-  optStartAtFile      = Nothing
-  }
+  optStartAtFile      = Nothing}
 
 options :: [OptDescr (Options -> Options)]
 options = [
   Option "c" ["only-changed-files"]
-    (NoArg  (\ opts     -> opts {optOnlyChangedFiles = True}))
+    (NoArg (\ opts -> opts {optOnlyChangedFiles = True}))
     "Only consider changing files that already\n\
     \have local modifications (NOTE: git-only\n\
     \currently).",
   Option "d" ["dir"]
-    (NoArg  (\ opts     -> opts {optOnlyChangedFiles = True}))
+    (ReqArg (\ d opts -> opts {optDir = Just d}) "<dir>")
     "Top-level directory containing parsable\n\
     \files of interest.  Abstract syntax trees\n\
     \will be cached in top-level .ast/\n\
     \directory.",
   Option "f" ["files"]
-    (NoArg  (\ opts     -> opts {optFiles = True}))
+    (NoArg (\ opts -> opts {optFiles = True}))
     "Pass a specific list of files to stdin\n\
     \(newline-delimited).",
   Option "n" ["max-n-files"]
-    (ReqArg (\ n opts   -> opts {optMaxN = Just $ read n}) "<n>")
+    (ReqArg (\ n opts -> opts {optMaxN = Just $ read n}) "<n>")
     "Change no more than <n> files total.",
   Option "s" ["start-at-file"]
-    (ReqArg (\ f opts   -> opts {optStartAtFile = Just f}) "<file>")
+    (ReqArg (\ f opts -> opts {optStartAtFile = Just f}) "<file>")
     "Start at a particular file instead of the\n\
     \\"beginning\" of the file list, looping back\n\
-    \around to get all files."
-  ]
+    \around to get all files."]
 
 endSpan :: (a -> Bool) -> [a] -> ([a], [a])
 endSpan p = uncurry (flip (,)) . bothond reverse . span p . reverse
@@ -70,10 +68,8 @@ wordWrap n s = a':wordWrap n b' where
     then (a, dropWhile isSpace b)
     else (aToLastWord, aLastWord ++ b)
 
--- note err should end in newline like GetOpt errors do
-usage :: [Char] -> b
-usage err = --do
-  --prog <- getProgName
+usage :: [Char] -> a
+usage err =
   error $ err ++ usageInfo header options ++ err ++
     "Transformers are:\n" ++ intercalate "\n" (sort $ map showTransf transfs)
   where
@@ -86,14 +82,11 @@ usage err = --do
     intercalate "\n" (zipWith (++) (repeat "  ") .
     wordWrap 78 $ transfDoc t)
 
-sourceFiles :: FilePath -> Bool -> IO [String]
-sourceFiles dir onlyChanged = do
-  let
-    cmd = if onlyChanged
-      then error "not working right now" --"git-files-modified"
-      else "find -iname '*.php'"
-  ls <- inCd dir $ run cmd
-  return ls
+sourceFiles :: [String] -> FilePath -> Bool -> IO [String]
+sourceFiles ftypes dir onlyChanged =
+  if onlyChanged
+    then error "not working right now" --"git-files-modified"
+    else Config.sourceFiles ftypes dir
 
 showStRes :: CanErrStrIO (Bool, [String]) -> CanErrStrIO Bool
 showStRes f = do
@@ -101,17 +94,16 @@ showStRes f = do
   io . putStr $ unlines st
   return ret
 
-lookupTrans :: String -> [String] -> FilePath -> FilePath -> Int -> Int ->
-  CanErrStrIO (Bool, [String])
+lookupTrans :: String -> Transf
 lookupTrans name = case filter ((== name) . transfName) transfs of
-  [t] -> transfFunc t
+  [t] -> t
   [] -> error $ "No transformer matched: " ++ name
   _ -> error $ "Serious uh-oh; multiple transformers matched: " ++ name
 
-transfOnFile :: [String] -> FilePath -> FilePath -> Int -> Int ->
+transfOnFile :: Transf -> [String] -> FilePath -> FilePath -> Int -> Int ->
   CanErrStrIO Bool
-transfOnFile (transf:args) dir file total cur =
-  showStRes $ (lookupTrans transf) args dir file total cur
+transfOnFile transf args dir file total cur =
+  showStRes $ (transfFunc transf) args dir file total cur
 
 changeMaxNFiles :: Maybe Int -> Int -> Int ->
   (String -> Int -> Int -> CanErrStrIO Bool) -> [String] -> CanErrStrIO ()
@@ -125,19 +117,19 @@ changeMaxNFiles nMb      total cur f (fileName:fileNames) = do
 
 main :: IO ()
 main = do
-  args <- getArgs
-  (opts, transfArgs) <- case getOpt Permute options args of
+  argsOrig <- getArgs
+  (opts, transfArgs) <- case getOpt Permute options argsOrig of
     (o, n, []) -> return (foldl (flip id) defaultOptions o, n)
     (_, _, errs) -> error $ concat errs
   case transfArgs of
     [] -> usage ""
-    _ -> do
-      dir <- case optDir opts of
-        Just dir' -> return dir'
-        Nothing -> getEnv "PWD"
+    (transfName:args) -> do
+      let
+        dir = fromMaybe "." $ optDir opts
+        transf = lookupTrans transfName
       subPaths <- if optFiles opts
         then getContents >>= return . lines
-        else sourceFiles dir $ optOnlyChangedFiles opts
+        else sourceFiles (transfTypes transf) dir $ optOnlyChangedFiles opts
       ret <- runErrorT $ do
         subPaths' <- case optStartAtFile opts of
           Nothing -> return subPaths
@@ -148,7 +140,8 @@ main = do
                 " which isn't in the list of files to change."
               _ -> return $ rest ++ pre
         changeMaxNFiles (optMaxN opts) (length subPaths') 1
-          (transfOnFile transfArgs dir) subPaths'
+          (transfOnFile transf args dir) subPaths'
       case ret of
         Left err -> hPutStr stderr err
         Right () -> return ()
+
