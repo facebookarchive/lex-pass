@@ -158,13 +158,19 @@ valExtend v@(state, ws) = case state of
       valExtend (ValLOnlyVal $ LOnlyValMemb a (ws, ws2) memb, wsEnd)
     <|> valExtendIndApp (LValLOnlyVal a) (ValLOnlyVal . LOnlyValInd a ws) ws
     <|> return v
-  ValROnlyVal a -> valExtendMemb (RValROnlyVal a) ws <|> return v
+  ValROnlyVal a -> valExtendMemb (RValROnlyVal a) ws
+    <|> do
+      ws2 <- tokLBracketP >> parse
+      st <- ValLRVal . LRValInd (RValROnlyVal a) ws . capify ws2 <$>
+        parse <* tokRBracketP
+      valExtend =<< (,) st <$> parse
+    <|> return v
   ValLRVal a ->
     do
       r <- liftM2 (,) (ValROnlyVal . ROnlyValFunc (Left a) ws <$>
         argListParser parse) parse
       valExtend r
-    <|> valExtendIndApp (LValLRVal a) (ValLRVal . LRValInd a ws) ws
+    <|> valExtendIndApp (LValLRVal a) (ValLRVal . LRValInd (RValLRVal a) ws) ws
     <|> valExtendMemb (RValLRVal a) ws
     <|> return v
 
