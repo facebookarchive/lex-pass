@@ -11,8 +11,7 @@ transfs = [
   -=- argless (lexPass $ changeNothing True),
   "no-op" -:- ftype -?-
   "For testing lex-pass.  Scan all files but do nothing."
-  -=- argless (lexPass $ changeNothing False)
-  ]
+  -=- argless (lexPass $ changeNothing False)]
 
 -- optionally pretend we changed something to make this file count and force
 -- rewrite.
