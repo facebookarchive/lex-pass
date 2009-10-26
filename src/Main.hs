@@ -117,6 +117,8 @@ changeMaxNFiles nMb      total cur f (fileName:fileNames) = do
 
 main :: IO ()
 main = do
+  hSetBuffering stdout LineBuffering
+  hSetBuffering stderr LineBuffering
   argsOrig <- getArgs
   (opts, transfArgs) <- case getOpt Permute options argsOrig of
     (o, n, []) -> return (foldl (flip id) defaultOptions o, n)
