@@ -11,7 +11,10 @@ transfs = [
   -=- (\ [oldF, newF] -> lexPass $ renameFunc oldF newF),
   "kill-func-arg <func-name> <arg-n-starting-at-1>" -:- ftype -?-
   "Kill the nth arg of all callsites. OO func-name not yet supported."
-  -=- (\ [f, n] -> lexPass . killFuncArg f $ read n)]
+  -=- (\ [f, n] -> lexPass . killFuncArg f $ read n),
+  "get-all-defd-funcs" -:- ftype -?-
+  "Get a list of all defined functions."
+  -=- (\ [] -> lexPass $ getAllDefdFuncs)]
 
 renameFunc :: String -> String -> Ast -> Transformed Ast
 renameFunc oldF newF = modAll $ \ a -> case a of
@@ -20,6 +23,9 @@ renameFunc oldF newF = modAll $ \ a -> case a of
       then pure $ ROnlyValFunc (Right $ Const [] newF) w args
       else transfNothing
   _ -> transfNothing
+
+getAllDefdFuncs :: Ast -> Transformed Ast
+getAllDefdFuncs = modAll $ \ (Func _ _ f _ _) -> Transformed [f] Nothing
 
 killFuncArg :: String -> Int -> Ast -> Transformed Ast
 killFuncArg f n = modAll $ \ a -> case a of
