@@ -568,7 +568,7 @@ instance Parse Xml where
     content <- (tokDivP >> tokGTP >> return Nothing) <|>
       Just <$> (tokGTP >>
         many (Right <$> try parse <|> Left <$> parse) <*
-        tokLTP <* tokDivP <* string tag <* tokGTP)
+        tokLTP <* tokDivP <* optional (string tag) <* tokGTP)
     return $ Xml tag attrs content
 
 instance Parse XmlLitOrExpr where
