@@ -22,6 +22,7 @@ executable lex-pass
   build-depends:  FUtil, HSH >= 2, base >= 4, binary, bytestring, containers,
                   derive, directory, filepath, mtl, parsec >= 2 && < 3, process,
                   syb
+  ghc-options:    -threaded
 
 executable lex-pass-test
   if !flag(test-only)
@@ -31,4 +32,5 @@ executable lex-pass-test
   build-depends:  FUtil, HSH >= 2, base >= 4, binary, bytestring, containers,
                   derive, directory, filepath, mtl, parsec >= 2 && < 3, process,
                   syb
+  ghc-options:    -threaded
 

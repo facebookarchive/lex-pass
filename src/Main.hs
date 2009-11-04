@@ -1,3 +1,5 @@
+import Control.Applicative
+import Control.Concurrent
 import Control.Monad
 import Control.Monad.Error
 import Data.Char
@@ -13,49 +15,9 @@ import System.Process
 
 import CodeGen.Transf
 import LexPassUtil
+import Options
+import TaskPool
 import qualified Config
-
-data Options = Options {
-  optFiles            :: Bool,
-  optOnlyChangedFiles :: Bool,
-  optMaxN             :: Maybe Int,
-  optDir              :: Maybe String,
-  optStartAtFile      :: Maybe String}
-  deriving Show
-
-defaultOptions :: Options
-defaultOptions = Options {
-  optFiles            = False,
-  optOnlyChangedFiles = False,
-  optMaxN             = Nothing,
-  optDir              = Nothing,
-  optStartAtFile      = Nothing}
-
-options :: [OptDescr (Options -> Options)]
-options = [
-  Option "c" ["only-changed-files"]
-    (NoArg (\ opts -> opts {optOnlyChangedFiles = True}))
-    "Only consider changing files that already\n\
-    \have local modifications (NOTE: git-only\n\
-    \currently).",
-  Option "d" ["dir"]
-    (ReqArg (\ d opts -> opts {optDir = Just d}) "<dir>")
-    "Top-level directory containing parsable\n\
-    \files of interest.  Abstract syntax trees\n\
-    \will be cached in top-level .ast/\n\
-    \directory.",
-  Option "f" ["files"]
-    (NoArg (\ opts -> opts {optFiles = True}))
-    "Pass a specific list of files to stdin\n\
-    \(newline-delimited).",
-  Option "n" ["max-n-files"]
-    (ReqArg (\ n opts -> opts {optMaxN = Just $ read n}) "<n>")
-    "Change no more than <n> files total.",
-  Option "s" ["start-at-file"]
-    (ReqArg (\ f opts -> opts {optStartAtFile = Just f}) "<file>")
-    "Start at a particular file instead of the\n\
-    \\"beginning\" of the file list, looping back\n\
-    \around to get all files."]
 
 endSpan :: (a -> Bool) -> [a] -> ([a], [a])
 endSpan p = uncurry (flip (,)) . bothond reverse . span p . reverse
@@ -82,12 +44,6 @@ usage err =
     intercalate "\n" (zipWith (++) (repeat "  ") .
     wordWrap 78 $ transfDoc t)
 
-sourceFiles :: [String] -> FilePath -> Bool -> IO [String]
-sourceFiles ftypes dir onlyChanged =
-  if onlyChanged
-    then error "not working right now" --"git-files-modified"
-    else Config.sourceFiles ftypes dir
-
 showStRes :: CanErrStrIO (Bool, [String]) -> CanErrStrIO Bool
 showStRes f = do
   (ret, st) <- f
@@ -100,20 +56,21 @@ lookupTrans name = case filter ((== name) . transfName) transfs of
   [] -> error $ "No transformer matched: " ++ name
   _ -> error $ "Serious uh-oh; multiple transformers matched: " ++ name
 
-transfOnFile :: Transf -> [String] -> FilePath -> FilePath -> Int -> Int ->
-  CanErrStrIO Bool
-transfOnFile transf args dir file total cur =
-  showStRes $ (transfFunc transf) args dir file total cur
+transfOnFile :: Options -> Transf -> [String] -> FilePath -> FilePath ->
+  Int -> Int -> CanErrStrIO Bool
+transfOnFile opts transf args dir file total cur =
+  showStRes $ (transfFunc transf) args opts dir file total cur
 
-changeMaxNFiles :: Maybe Int -> Int -> Int ->
-  (String -> Int -> Int -> CanErrStrIO Bool) -> [String] -> CanErrStrIO ()
-changeMaxNFiles (Just 0) _     _   _ _                    = return ()
-changeMaxNFiles _        _     _   _ []                   = return ()
-changeMaxNFiles nMb      total cur f (fileName:fileNames) = do
-  res <- f fileName total cur
-  let
-    nMb' = liftM (\ n -> if res then n - 1 else n) nMb
-  changeMaxNFiles nMb' total (cur + 1) f fileNames
+changeFiles :: Options -> (FilePath -> Int -> Int -> CanErrStrIO Bool) ->
+  [FilePath] -> IO ()
+changeFiles opts f paths = taskPool (optNumCores opts) .
+  map (\ (n, p) -> dieOnErrors $ f p (length paths) n) $ zip [1..] paths
+
+dieOnErrors x = do
+  r <- runErrorT x
+  case r of
+    Left e -> error e
+    Right _ -> return ()
 
 main :: IO ()
 main = do
@@ -131,19 +88,13 @@ main = do
         transf = lookupTrans transfName
       subPaths <- if optFiles opts
         then getContents >>= return . lines
-        else sourceFiles (transfTypes transf) dir $ optOnlyChangedFiles opts
-      ret <- runErrorT $ do
-        subPaths' <- case optStartAtFile opts of
-          Nothing -> return subPaths
-          Just f -> do
-            let (pre, rest) = span (/= f) subPaths
-            case rest of
-              [] -> throwError $ "Couldn't start at file " ++ show f ++
-                " which isn't in the list of files to change."
-              _ -> return $ rest ++ pre
-        changeMaxNFiles (optMaxN opts) (length subPaths') 1
-          (transfOnFile transf args dir) subPaths'
-      case ret of
-        Left err -> hPutStr stderr err
-        Right () -> return ()
+        else Config.sourceFiles (transfTypes transf) dir
+      let
+        subPaths' = case optStartAtFile opts of
+          Nothing -> subPaths
+          Just f -> let (pre, rest) = span (/= f) subPaths in case rest of
+            [] -> error $ "Couldn't start at file " ++ show f ++
+              " which isn't in the list of files to change."
+            _ -> rest ++ pre
+      changeFiles opts (transfOnFile opts transf args dir) subPaths'
 

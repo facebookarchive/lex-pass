@@ -10,6 +10,7 @@ import Data.Generics
 import FUtil
 import HSH
 import Lang.Php.Ast
+import Options
 import System.Directory
 import System.FilePath
 import System.IO
@@ -24,15 +25,14 @@ data Transf = Transf {
   transfName :: String,
   transfTypes :: [String],
   transfDoc :: String,
-  transfArgs :: String,
-  transfFunc :: [String] -> FilePath -> FilePath -> Int -> Int ->
-    CanErrStrIO (Bool, [String])
-  }
+  transfArgs :: String,  -- unused currently
+  transfFunc :: [String] -> Options -> FilePath -> FilePath -> Int -> Int ->
+    CanErrStrIO (Bool, [String])}
 
 data Transformed a = Transformed {
   infoLines :: [String],
-  transfResult :: Maybe a
-  } deriving (Show)
+  transfResult :: Maybe a}
+  deriving (Show)
 
 instance Functor Transformed where
   fmap f t = t {transfResult = fmap f $ transfResult t}
@@ -50,15 +50,15 @@ name -:- ftypes = (name, ftypes)
 (-?-) :: (String, [String]) -> String -> (String, [String], String)
 (name, ftypes) -?- doc = (name, ftypes, doc)
 
-(-=-) :: (String, [String], String) -> ([String] -> FilePath -> FilePath ->
-  Int -> Int -> CanErrStrIO (Bool, [String])) -> Transf
+(-=-) :: (String, [String], String) -> ([String] -> Options -> FilePath ->
+  FilePath -> Int -> Int -> CanErrStrIO (Bool, [String])) -> Transf
 (name, ftypes, doc) -=- func = Transf {
   transfName = bareName,
   transfTypes = ftypes,
   transfDoc = doc,
-  transfArgs = argInfo,  -- unused currently
-  transfFunc = func
-  } where (bareName, argInfo) = break (== ' ') name
+  transfArgs = argInfo,
+  transfFunc = func}
+  where (bareName, argInfo) = break (== ' ') name
 
 -- todo: something more graceful here?
 argless :: (t -> t1 -> t2) -> [a] -> t -> t1 -> t2
@@ -66,11 +66,11 @@ argless f args dir subPath = if null args then f dir subPath
   else error "Expected no arguments."
 
 lexPass :: (Binary a, Parse a, Unparse a) => (a -> Transformed a) ->
-  FilePath -> FilePath -> Int -> Int -> CanErrStrIO (Bool, [String])
-lexPass transf codeDir subPath total cur = do
+  Options -> FilePath -> FilePath -> Int -> Int -> CanErrStrIO (Bool, [String])
+lexPass transf opts codeDir subPath total cur = do
   io . hPutStrLn stderr $ "Checking (" ++ show cur ++ "/" ++ show total ++
     ") " ++ subPath
-  ast <- io $ parseAndCache codeDir subPath
+  ast <- io $ parseAndCache (optCacheAsts opts) codeDir subPath
   case transf ast of
     Transformed {infoLines = infoLines, transfResult = Nothing} ->
       return (False, infoLines)
@@ -167,8 +167,9 @@ astPath codeDir subPath = codeDir </> ".ast" </> subPath ++ ".ast"
 transfModsFile = updateState ((,) True . snd)
 
 -- combine these into AnAst?
-parseAndCache :: (Binary a, Parse a, Unparse a) => FilePath -> FilePath -> IO a
-parseAndCache codeDir subPath = do
+parseAndCache :: (Binary a, Parse a, Unparse a) =>
+  Bool -> FilePath -> FilePath -> IO a
+parseAndCache cacheAsts codeDir subPath = do
   let
     astFilename = astPath codeDir subPath
     regen = do
@@ -180,14 +181,22 @@ parseAndCache codeDir subPath = do
           createDirectoryIfMissing True $ takeDirectory astFilename
           encodeFile astFilename ast
           return ast
-  doesFileExist astFilename >>= \ r -> if r
-    then do
-      mtimeAst  <- getModificationTime astFilename
-      mtimeFile <- getModificationTime (codeDir </> subPath)
-      if mtimeFile > mtimeAst
-        then regen
-        else decodeFile astFilename
-    else regen
+  if cacheAsts
+    then
+      doesFileExist astFilename >>= \ r -> if r
+        then do
+          mtimeAst  <- getModificationTime astFilename
+          mtimeFile <- getModificationTime (codeDir </> subPath)
+          if mtimeFile > mtimeAst
+            then regen
+            else decodeFile astFilename
+        else regen
+    else do
+      hPutStrLn stderr "- Parsing (always)"
+      c <- readFileStrict $ codeDir </> subPath
+      return $ case runParser parse () subPath c of
+        Left err -> error $ show err
+        Right ast -> ast
 
 --
 -- eof
