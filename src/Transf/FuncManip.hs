@@ -1,4 +1,4 @@
-module Transf.KillFuncArg where
+module Transf.FuncManip where
 
 import Lang.Php
 import TransfUtil
@@ -14,7 +14,10 @@ transfs = [
   -=- (\ [] -> lexPass $ getAllDefdFuncs),
   "kill-func-arg <func-name> <arg-n-starting-at-1>" -:- ftype -?-
   "Kill the nth arg of all callsites. OO func-name not yet supported."
-  -=- (\ [f, n] -> lexPass . killFuncArg f $ read n)]
+  -=- (\ [f, n] -> lexPass . killFuncArg f $ read n),
+  "make-public-explicit" -:- ftype -?-
+  "Add \"public\" to class functions without an explicit access keyword."
+  -=- (\ [] -> lexPass $ makePublicExplicit)]
 
 renameFunc :: String -> String -> Ast -> Transformed Ast
 renameFunc oldF newF = modAll $ \ a -> case a of
@@ -40,5 +43,15 @@ killFuncArg f n = modAll $ \ a -> case a of
     if f' == f
       then pure $ ROnlyValFunc c w (Right $ take (n - 1) args ++ drop n args)
       else transfNothing
+  _ -> transfNothing
+
+isAccessKeyword :: String -> Bool
+isAccessKeyword x = x `elem` ["public", "private", "protected"]
+
+makePublicExplicit :: Ast -> Transformed Ast
+makePublicExplicit = modAll $ \ cStmt -> case cStmt of
+  CStmtFuncDef pre f -> if any (isAccessKeyword . map toLower . fst) pre
+    then transfNothing
+    else pure $ CStmtFuncDef (("public", [WS " "]):pre) f
   _ -> transfNothing
 
