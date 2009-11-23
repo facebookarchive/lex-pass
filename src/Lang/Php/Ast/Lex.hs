@@ -10,7 +10,7 @@ data StrLit = StrLit String
 
 instance Parse StrLit where
   parse = StrLit <$> (
-    liftM2 (:) (char '"') (strLitRestParser '"') <|>
+    liftM2 (:) (char '"') (strLitRestParserCurly '"' False) <|>
     liftM2 (:) (char '\'') (strLitRestParser '\'')
     )
 
@@ -23,16 +23,36 @@ strLitRestParser end = anyChar >>= \ c -> (c:) <$>
     then liftM2 (:) anyChar (strLitRestParser end)
     else strLitRestParser end
 
+-- "{$a["{$a}"]}" e.g. is a legal single string literal in php..
+strLitRestParserCurly :: Char -> Bool -> Parser String
+strLitRestParserCurly end haveCurly = anyChar >>= \ c -> (c:) <$>
+  if c == end then return [] else if c == '\\'
+    then liftM2 (:) anyChar (strLitRestParserCurly end False)
+    else
+      if c == '{'
+        then strLitRestParserCurly end True
+        else
+          if haveCurly && c == '$'
+            then
+              liftM2 (++)
+                (strLitRestParserCurly '}' False)
+                (strLitRestParserCurly end False)
+            else strLitRestParserCurly end False
+
 backticksParser :: Parser String
-backticksParser = liftM2 (:) (char '`') (strLitRestParser '`')
+backticksParser = liftM2 (:) (char '`') (strLitRestParserCurly '`' False)
 
 data NumLit = NumLit String
   deriving (Eq, Show, Typeable, Data)
 
 instance Parse NumLit where
   -- could be tighter
-  parse = NumLit <$> (liftM2 (:) (oneOf $ '.':['0'..'9']) .
-    many . oneOf $ 'x':'.':['0'..'9'] ++ ['a'..'f'] ++ ['A'..'F'])
+  parse = NumLit <$> (liftM2 (++) numStart (ptAndRest <|> return "") <|>
+    ptAndRest)
+    where
+    numStart = liftM2 (:) (oneOf ['0'..'9']) noDecPt
+    ptAndRest = liftM2 (:) (char '.') noDecPt
+    noDecPt = many . oneOf $ 'x':['0'..'9'] ++ ['a'..'f'] ++ ['A'..'F']
 
 instance Unparse NumLit where
   unparse (NumLit a) = a

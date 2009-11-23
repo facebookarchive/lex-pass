@@ -61,7 +61,7 @@ data Const = Const [(String, WS2)] String -- "a::a"
 data ROnlyVal =
   ROnlyValConst Const |
   -- "a()", "$a()"
-  ROnlyValFunc  (Either LRVal Const) WS (Either WS [WSCap Expr])
+  ROnlyValFunc  (Either LRVal Const) WS (Either WS [WSCap (Either Expr LVal)])
   deriving (Eq, Show, Typeable, Data)
 
 data Memb =

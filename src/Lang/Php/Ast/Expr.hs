@@ -106,6 +106,9 @@ dynConstOrConstParser = do
     Left c -> first (Right . Const statics) c
     Right d -> first (Left . DynConst statics) d
 
+exprOrLValParser :: Parser (Either Expr LVal, WS)
+exprOrLValParser = try (first Left <$> parse) <|> first Right <$> parse
+
 instance Parse (Val, WS) where
   parse = listVal <|> otherVal where
     listVal = tokListP >> liftM2 (,)
@@ -116,7 +119,7 @@ instance Parse (Val, WS) where
       valExtend =<< case dOrC of
         Left d -> return (ValLRVal $ LRValVar d, ws)
         Right c -> (first ValROnlyVal <$>) $
-          liftM2 (,) (ROnlyValFunc (Right c) ws <$> argListParser parse) parse
+          liftM2 (,) (ROnlyValFunc (Right c) ws <$> argListParser exprOrLValParser) parse
           <|> return (ROnlyValConst c, ws)
 
 firstM :: (Monad m) => (a -> m b) -> (a, c) -> m (b, c)
@@ -168,7 +171,7 @@ valExtend v@(state, ws) = case state of
   ValLRVal a ->
     do
       r <- liftM2 (,) (ValROnlyVal . ROnlyValFunc (Left a) ws <$>
-        argListParser parse) parse
+        argListParser exprOrLValParser) parse
       valExtend r
     <|> valExtendIndApp (LValLRVal a) (ValLRVal . LRValInd (RValLRVal a) ws) ws
     <|> valExtendMemb (RValLRVal a) ws
