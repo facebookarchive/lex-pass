@@ -562,8 +562,10 @@ eptOrWd  = binOp BOrWd  tokOrWdP
 
 instance Parse Xml where
   parse = tokLTP >> do
-    tag <- many1 (oneOf $ [':', '-'] ++ ['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'])
-    attrs <- IC.intercalParser parse . liftM2 (,) genIdentifierParser $
+    tag <- many1 . oneOf $
+      -- i thought _ wasn't allowed but i guess when marcel's away e will play
+      [':', '-', '_'] ++ ['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9']
+    attrs <- IC.intercalParser parse . liftM2 (,) xmlIdentifierParser $
       Just <$> try (liftM2 (,) (liftM2 (,) parse (tokEqualsP >> parse)) $
         (tokLBraceP >> Right <$> parse <* tokRBraceP) <|>
         Left <$> parse) <|>

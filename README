@@ -28,6 +28,7 @@ to use
 
 notes for those hacking on lex-pass itself
 - todo
+  - php: b'' type string literals
   - maintain cached asts for codebase somewhere so ppl don't have to wait on
     their first lex-pass run?
   - better error on one-arg transf's if args wrong?
