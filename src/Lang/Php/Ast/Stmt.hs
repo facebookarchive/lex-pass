@@ -82,7 +82,7 @@ cStmtConstUnparser vars = tokConst ++
 
 instance Unparse AbstrFunc where
   unparse (AbstrFunc pre ref name args ws end) = concat [unparsePre pre,
-    tokFunction, maybe "" ((tokAmp ++) . unparse) ref, unparse name, tokLParen,
+    tokFunction, maybe "" ((++ tokAmp) . unparse) ref, unparse name, tokLParen,
     either unparse (intercalate tokComma . map unparse) args, tokRParen,
     unparse ws, unparse end]
 

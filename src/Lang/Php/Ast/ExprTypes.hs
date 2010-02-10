@@ -104,7 +104,7 @@ data Expr =
 
 data Xml = Xml String
   (IC.Intercal WS (String, Maybe (WS2, Either StrLit (WSCap Expr))))
-  (Maybe [Either XmlLitOrExpr Xml])
+  (Maybe ([Either XmlLitOrExpr Xml], Bool))
   deriving (Eq, Show, Typeable, Data)
 
 data XmlLitOrExpr = XmlLit String | XmlExpr (WSCap Expr)

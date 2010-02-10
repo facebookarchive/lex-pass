@@ -336,8 +336,9 @@ instance Unparse Xml where
         maybe "" (\ (w, v) -> w2With tokEquals w ++
         either unparse ((tokLBrace ++) . (++ tokRBrace) . unparse) v) vMb)
       attrs ++
-    maybe tokDiv (\ c -> tokGT ++ concatMap unparse c ++ tokLT ++
-      tokDiv ++ tag) content ++
+    maybe tokDiv (\ (c, hasExplicitCloseTag) ->
+      tokGT ++ concatMap unparse c ++ tokLT ++ tokDiv ++
+      if hasExplicitCloseTag then tag else "") content ++
     tokGT
 
 instance Unparse XmlLitOrExpr where
@@ -571,9 +572,10 @@ instance Parse Xml where
         Left <$> parse) <|>
       return Nothing
     content <- (tokDivP >> tokGTP >> return Nothing) <|>
-      Just <$> (tokGTP >>
-        many (Right <$> try parse <|> Left <$> parse) <*
-        tokLTP <* tokDivP <* optional (string tag) <* tokGTP)
+      Just <$> liftM2 (,)
+        (tokGTP >> many (Right <$> try parse <|> Left <$> parse))
+        (tokLTP >> tokDivP >> ((string tag >> return True) <|> return False))
+        <* tokGTP
     return $ Xml tag attrs content
 
 instance Parse XmlLitOrExpr where

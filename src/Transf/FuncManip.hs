@@ -17,7 +17,7 @@ transfs = [
   -=- (\ [f, n] -> lexPass . killFuncArg f $ read n),
   "make-public-explicit" -:- ftype -?-
   "Add \"public\" to class functions without an explicit access keyword."
-  -=- (\ [] -> lexPass $ makePublicExplicit)]
+  -=- (\ [] -> lexPass makePublicExplicit)]
 
 renameFunc :: String -> String -> Ast -> Transformed Ast
 renameFunc oldF newF = modAll $ \ a -> case a of
