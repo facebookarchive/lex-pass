@@ -32,7 +32,7 @@ wordWrap n s = a':wordWrap n b' where
 
 usage :: [Char] -> a
 usage err =
-  error $ err ++ usageInfo header options ++ err ++
+  error $ err ++ usageInfo header options ++
     "Transformers are:\n" ++ intercalate "\n" (sort $ map showTransf transfs)
   where
   header =
@@ -82,7 +82,7 @@ main = do
   argsOrig <- getArgs
   (opts, transfArgs) <- case getOpt Permute options argsOrig of
     (o, n, []) -> return (foldl (flip id) defaultOptions o, n)
-    (_, _, errs) -> error $ concat errs
+    (_, _, errs) -> usage $ concat errs
   case transfArgs of
     [] -> usage ""
     (transfName:args) -> do
