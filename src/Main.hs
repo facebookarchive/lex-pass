@@ -72,6 +72,9 @@ dieOnErrors x = do
     Left e -> error e
     Right _ -> return ()
 
+killInitialDotSlash ('.':'/':rest) = killInitialDotSlash rest
+killInitialDotSlash rest = rest
+
 main :: IO ()
 main = do
   hSetBuffering stdout LineBuffering
@@ -86,15 +89,16 @@ main = do
       let
         dir = fromMaybe "." $ optDir opts
         transf = lookupTrans transfName
-      subPaths <- if optFiles opts
+      subPaths <- map killInitialDotSlash <$> if optFiles opts
         then getContents >>= return . lines
         else Config.sourceFiles (transfTypes transf) dir
       let
         subPaths' = case optStartAtFile opts of
           Nothing -> subPaths
-          Just f -> let (pre, rest) = span (/= f) subPaths in case rest of
-            [] -> error $ "Couldn't start at file " ++ show f ++
+          Just f -> let (pre, rest) = span (/= f') subPaths in case rest of
+            [] -> error $ "Couldn't start at file " ++ show f' ++
               " which isn't in the list of files to change."
             _ -> rest ++ pre
+            where f' = killInitialDotSlash f
       changeFiles opts (transfOnFile opts transf args dir) subPaths'
 
