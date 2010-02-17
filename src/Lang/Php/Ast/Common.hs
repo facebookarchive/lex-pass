@@ -105,6 +105,9 @@ data WSCap a = WSCap {
 instance (Unparse a) => Unparse (WSCap a) where
   unparse (WSCap a b c) = concat [unparse a, unparse b, unparse c]
 
+instance Functor WSCap where
+  fmap f w = w {wsCapMain = f $ wsCapMain w}
+
 capify :: WS -> (a, WS) -> WSCap a
 capify a (b, c) = WSCap a b c
 
