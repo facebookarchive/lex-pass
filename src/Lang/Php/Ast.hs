@@ -2,8 +2,8 @@
 
 module Lang.Php.Ast (
   module Lang.Php.Ast.Common,
-  module Lang.Php.Ast.ExprTypes,
-  module Lang.Php.Ast.StmtTypes,
+  module Lang.Php.Ast.Expr,
+  module Lang.Php.Ast.Stmt,
   Ast
   ) where
 
@@ -14,10 +14,8 @@ import Control.Monad
 import Data.Char
 import Lang.Php.Ast.Common
 import Lang.Php.Ast.Expr
-import Lang.Php.Ast.ExprTypes
 import Lang.Php.Ast.Lex
 import Lang.Php.Ast.Stmt
-import Lang.Php.Ast.StmtTypes
 import qualified Data.ByteString as BS
 import qualified Data.Intercal as IC
 
