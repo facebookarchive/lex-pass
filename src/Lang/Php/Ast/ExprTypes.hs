@@ -16,7 +16,7 @@ import qualified Data.Intercal as IC
 -- "$$a[0]->a = 5;".  So we're regarding this as a by-product of the Zend
 -- implementation.  In particular, we think they simplify their job by slurping
 -- all [Expr?]'s onto Var's and only later analyze things with regard to LVal
--- considerations, simply fataling if something is then arwy.
+-- considerations, simply fataling if something is then awry.
 --
 -- Modeling that nuance is impractical under the clear division of
 -- Var's, LVal's, and RVal's that we desire to make the AST nice for
