@@ -459,6 +459,7 @@ funclike1Parser constr tokP = liftM2 constr (tokP >> parse)
 
 exprParserTable :: [[Oper (Expr, WS)]]
 exprParserTable = [
+  [Postfix eptIndex],
   [Prefix eptClone],
   [Prefix eptPreIncr, Prefix eptPreDecr,
    Postfix eptPostIncr, Postfix eptPostDecr],
@@ -479,8 +480,7 @@ exprParserTable = [
   [Postfix eptTernaryIf],
   ial [eptAndWd],
   ial [eptXorWd],
-  ial [eptOrWd],
-  [Postfix eptIndex]]
+  ial [eptOrWd]]
 
 preRep, postRep :: Parser (a -> a) -> Parser (a -> a)
 preRep p = (p >>= \ f -> (f .) <$> preRep p) <|> return id
