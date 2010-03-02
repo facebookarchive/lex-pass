@@ -83,6 +83,8 @@ data Expr =
   ExprEval      WS (WSCap Expr) |
   ExprExit      Bool (Maybe (WS, Either WS (WSCap Expr))) |
   ExprHereDoc   HereDoc |
+  -- FIXME: this fb extension should be separated to a superclass-like Lang?
+  ExprIndex     Expr WS (WSCap Expr) |
   ExprInclude   IncOrReq OnceOrNot WS Expr |
   -- true story: "instanceof" takes LRVal's but not non-Const ROnlyVal's..
   ExprInstOf    Expr WS2 (Either LRVal Const) |

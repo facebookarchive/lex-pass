@@ -246,6 +246,8 @@ instance Unparse Expr where
         either unparse unparse x ++ tokRParen) a
     ExprHereDoc a -> unparse a
     ExprInclude a b w e -> unparse a ++ unparse b ++ unparse w ++ unparse e
+    ExprIndex a w b ->
+      unparse a ++ unparse w ++ tokLBracket ++ unparse b ++ tokRBracket
     ExprInstOf e w t -> unparse e ++ w2With tokInstanceof w ++ unparse t
     ExprIsset w vs -> tokIsset ++ unparse w ++ tokLParen ++
       intercalate tokComma (map unparse vs) ++ tokRParen
@@ -477,7 +479,8 @@ exprParserTable = [
   [Postfix eptTernaryIf],
   ial [eptAndWd],
   ial [eptXorWd],
-  ial [eptOrWd]]
+  ial [eptOrWd],
+  [Postfix eptIndex]]
 
 preRep, postRep :: Parser (a -> a) -> Parser (a -> a)
 preRep p = (p >>= \ f -> (f .) <$> preRep p) <|> return id
@@ -560,6 +563,12 @@ eptTernaryIf = do
 eptAndWd = binOp BAndWd tokAndWdP
 eptXorWd = binOp BXorWd tokXorWdP
 eptOrWd  = binOp BOrWd  tokOrWdP
+
+eptIndex :: Parser ((Expr, WS) -> (Expr, WS))
+eptIndex = do
+  e2 <- tokLBracketP >> parse
+  w2 <- tokRBracketP >> parse
+  return $ \ (e1, w1) -> (ExprIndex e1 w1 e2, w2)
 
 instance Parse Xml where
   parse = tokLTP >> do
