@@ -15,8 +15,7 @@ module Lang.Php.Ast.Common (
   module Data.Maybe,
   module FUtil,
   WS, WS2, WSElem(..), WSCap(..), capify, wsNoNLParser, w2With,
-  upToCharsOrEndParser,
-  rePairRight, rePairLeft) where
+  upToCharsOrEndParser) where
 
 import Common
 import Control.Applicative hiding ((<|>), many, optional, Const)
@@ -116,12 +115,6 @@ instance (Parse (a, WS)) => Parse (WSCap a) where
 
 instance Parse a => Parse (a, WS) where
   parse = liftM2 (,) parse parse
-
-rePairLeft :: (a, (b, c)) -> ((a, b), c)
-rePairLeft (a, (b, c)) = ((a, b), c)
-
-rePairRight :: ((a, b), c) -> (a, (b, c))
-rePairRight ((a, b), c) = (a, (b, c))
 
 $(derive makeBinary ''WSElem)
 $(derive makeBinary ''WSCap)
