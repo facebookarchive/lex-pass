@@ -1,8 +1,5 @@
-{-# LANGUAGE DeriveDataTypeable, TemplateHaskell, FlexibleInstances,
-             FlexibleContexts, OverlappingInstances #-}
-
-
-module Lang.Php.Ast.ExprParse (LVal(..), RVal(..)) where
+{-# LANGUAGE FlexibleContexts, FlexibleInstances #-}
+module Lang.Php.Ast.ExprParse where
 
 import Control.Monad.Identity
 import Lang.Php.Ast.ArgList
@@ -590,4 +587,3 @@ instance Parse Xml where
 instance Parse XmlLitOrExpr where
   parse = (tokLBraceP >> XmlExpr <$> parse <* tokRBraceP) <|>
     XmlLit <$> many1 (satisfy (`notElem` "<{"))
-
