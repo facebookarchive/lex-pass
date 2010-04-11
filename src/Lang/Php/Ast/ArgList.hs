@@ -2,6 +2,7 @@
 
 module Lang.Php.Ast.ArgList where
 
+import Data.Either.Utils
 import Lang.Php.Ast.Common
 import Lang.Php.Ast.Lex
 import qualified Data.Intercal as IC
