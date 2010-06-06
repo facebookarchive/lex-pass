@@ -102,7 +102,7 @@ data ClassStmt =
 
 data DoWhile = DoWhile {
   doWhileBlock   :: WSCap BlockOrStmt,
-  doWhileExpr    :: WSCap (WSCap Expr),
+  doWhileExpr    :: WSCap2 Expr,
   doWhileStmtEnd :: StmtEnd}
   deriving (Eq, Show, Typeable, Data)
 
@@ -130,12 +130,12 @@ data If = If {
   deriving (Eq, Show, Typeable, Data)
 
 data IfBlock = IfBlock {
-  ifBlockExpr  :: WSCap (WSCap Expr),
+  ifBlockExpr  :: WSCap2 Expr,
   ifBlockBlock :: BlockOrStmt}
   deriving (Eq, Show, Typeable, Data)
 
 data Switch = Switch {
-  switchExpr  :: WSCap (WSCap Expr),
+  switchExpr  :: WSCap2 Expr,
   switchWS    :: WS,
   switchCases :: [Case]}
   deriving (Eq, Show, Typeable, Data)
@@ -152,7 +152,7 @@ data Catch = Catch {
   deriving (Eq, Show, Typeable, Data)
 
 data While = While {
-  whileExpr  :: WSCap (WSCap Expr),
+  whileExpr  :: WSCap2 Expr,
   whileBlock :: BlockOrStmt}
   deriving (Eq, Show, Typeable, Data)
 

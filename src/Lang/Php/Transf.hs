@@ -42,6 +42,16 @@ modAllStmts f = modIntercal $ \ wsPre s wsPost -> case f wsPre s wsPost of
     doCase x = (\ a -> x {caseStmtList = a}) <$> modAllStmts f (caseStmtList x)
     single x = IC.singleton wsPre x wsPost
 
+modIfBlockExpr :: (WSCap2 Expr -> Transformed (WSCap2 Expr)) ->
+  IfBlock -> Transformed IfBlock
+modIfBlockExpr t (IfBlock expr block) = flip IfBlock block <$> t expr
+
+modWSCap :: (a -> Transformed a) -> WSCap a -> Transformed (WSCap a)
+modWSCap t (WSCap w1 a w2) = (\ b -> WSCap w1 b w2) <$> t a
+
+modWSCap2 :: (a -> Transformed a) -> WSCap2 a -> Transformed (WSCap2 a)
+modWSCap2 = modWSCap . modWSCap
+
 lastIndent :: WS -> WS2
 lastIndent [] = ([], [])
 lastIndent ws = case wsTail of

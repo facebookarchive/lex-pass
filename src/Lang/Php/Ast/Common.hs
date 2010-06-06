@@ -14,7 +14,7 @@ module Lang.Php.Ast.Common (
   module Data.List,
   module Data.Maybe,
   module FUtil,
-  WS, WS2, WSElem(..), WSCap(..), capify, wsNoNLParser, w2With,
+  WS, WS2, WSElem(..), WSCap(..), WSCap2, capify, wsNoNLParser, w2With,
   upToCharsOrEndParser) where
 
 import Common
@@ -115,6 +115,8 @@ instance (Parse (a, WS)) => Parse (WSCap a) where
 
 instance Parse a => Parse (a, WS) where
   parse = liftM2 (,) parse parse
+
+type WSCap2 a = WSCap (WSCap a)
 
 $(derive makeBinary ''WSElem)
 $(derive makeBinary ''WSCap)
