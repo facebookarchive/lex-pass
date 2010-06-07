@@ -25,6 +25,7 @@ exprLRValToRight (ExprBinOp op e1 w e2) =
   if op `elem` [BEQ, BNE, BID, BNI] && exprIsLRVal e1 && not (exprIsLRVal e2)
     then pure $ ExprBinOp op e2 w e1
     else transfNothing
+exprLRValToRight _ = transfNothing
 
 assignablesGoRight :: Ast -> Transformed Ast
 assignablesGoRight = modAll . modIfBlockExpr $ modWSCap2 exprLRValToRight
