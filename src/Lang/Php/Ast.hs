@@ -3,6 +3,7 @@
 module Lang.Php.Ast (
   module Lang.Php.Ast.Common,
   module Lang.Php.Ast.Expr,
+  module Lang.Php.Ast.Lex,
   module Lang.Php.Ast.Stmt,
   Ast
   ) where
