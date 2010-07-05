@@ -72,6 +72,19 @@ lastLine ws = case lastIndent ws of
   (_, [WS s]) -> [WS $ '\n':s]
   _ -> [WS "\n"]
 
+onWSCap1 :: (WS -> WS) -> WSCap a -> WSCap a
+onWSCap1 f (WSCap w1 a w2) = WSCap (f w1) a w2
+
+onWSCap2 :: (WS -> WS) -> WSCap a -> WSCap a
+onWSCap2 f (WSCap w1 a w2) = WSCap w1 a (f w2)
+
+wsStartTransfer :: WS -> WS -> WS
+wsStartTransfer a b = takeWhile wsElemIsWS a ++ dropWhile wsElemIsWS b
+
+wsElemIsWS :: WSElem -> Bool
+wsElemIsWS (WS _) = True
+wsElemIsWS _ = False
+
 strToUnits :: String -> (Bool, [String])
 strToUnits ('"':rest) = (,) True . strDubToUnits $ init rest
   where
