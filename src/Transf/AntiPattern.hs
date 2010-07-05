@@ -76,12 +76,13 @@ pregSplitNonRegex = modAll $ \ a -> case a of
       then
         case arg0 of
           WSCap w1 (Left (ExprStrLit (StrLit s))) w2 ->
-            if any regexUnitIsMeta sRegexUnits
-              then transfNothing
-              else pure . ROnlyValFunc c' w $ Right (arg0':args)
+            if null sRegexPost && not (any regexUnitIsMeta sRegexUnits)
+              then pure . ROnlyValFunc c' w $ Right (arg0':args)
+              else transfNothing
             where
             (sIsDub, sUnits) = strToUnits s
-            (_, sRegexUnits) = regexUnits $ map normalizeStrUnit sUnits
+            (_, (sRegexUnits, sRegexPost)) =
+              regexUnits $ map normalizeStrUnit sUnits
             c' = Right (Const [] "explode")
             arg0' = WSCap w1 (strToArg s') w2
             s' = strUnitsToStr (sIsDub, map last sRegexUnits)

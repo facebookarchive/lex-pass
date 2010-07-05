@@ -116,13 +116,17 @@ normalizeStrUnit ('\\':'x':rest) = "\\x" ++ map toUpper rest
 normalizeStrUnit c = c
 
 -- note: only works on normalized str units
-regexUnits :: [String] -> (Int, [[String]])
-regexUnits (c:rest) = (i, regexUnitsDelim i $ init rest) where
+regexUnits :: [String] -> (Int, ([[String]], [String]))
+regexUnits (c:rest) = (i, regexUnitsDelim i rest) where
   i = phpOrd c
-  regexUnitsDelim :: Int -> [String] -> [[String]]
-  regexUnitsDelim delim (b@"\\\\":u:rest) = [b, u] : regexUnitsDelim delim rest
-  regexUnitsDelim delim (u:rest) = [u] : regexUnitsDelim delim rest
-  regexUnitsDelim _ [] = []
+  regexUnitsDelim :: Int -> [String] -> ([[String]], [String])
+  regexUnitsDelim delim (b@"\\\\":u:rest) =
+    first ([b, u] :) $ regexUnitsDelim delim rest
+  regexUnitsDelim delim (u:rest) =
+    if phpOrd u == delim
+      then ([], rest)
+      else first ([u] :) $ regexUnitsDelim delim rest
+  regexUnitsDelim _ [] = ([], [])
 
 phpOrd :: String -> Int
 phpOrd "\\t" = ord '\t'
