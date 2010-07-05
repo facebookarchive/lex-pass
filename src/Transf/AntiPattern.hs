@@ -14,11 +14,15 @@ transfs :: [Transf]
 transfs = [
   "assignables-go-right" -:- ftype -?-
   "\"if ($x == true)\" -> \"if (true == $x)\" etc"
-  -=- (\ [] -> lexPass $ assignablesGoRight),
+  -=- (\ [] -> lexPass assignablesGoRight),
   "kill-split" -:- ftype -?-
   "split() becomes preg_split()"
   -- TODO: detect non-regex case and go to explode() instead of preg_split()?
-  -=- (\ [] -> lexPass $ killSplit)]
+  -=- (\ [] -> lexPass killSplit),
+  "preg-split-non-regex" -:- ftype -?-
+  "preg_split('/a/', ..) becomes explode('a', ..)"
+  -=- (\ [] -> lexPass pregSplitNonRegex)
+  ]
 
 assignablesGoRight :: Ast -> Transformed Ast
 assignablesGoRight = modAll . modIfBlockExpr $ modWSCap2 exprLRValToRight
@@ -46,10 +50,10 @@ killSplit = modAll $ \ a -> case a of
   ROnlyValFunc _c@(Right (Const [] "split")) w (Right (arg0:args)) ->
     case arg0 of
       WSCap w1 (Left (ExprStrLit (StrLit s))) w2 ->
-        pure . ROnlyValFunc c' w . Right $ arg0':args
+        pure . ROnlyValFunc c' w $ Right (arg0':args)
         where
         c' = Right (Const [] "preg_split")
-        arg0' = WSCap w1 (Left (ExprStrLit (StrLit s'))) w2
+        arg0' = WSCap w1 (strToArg s') w2
         s' = onTail (onInit $ delimify '/' '\\') s
       _ -> transfNothing
   _ -> transfNothing
@@ -64,4 +68,34 @@ onTail _f l = l
 
 onInit :: ([a] -> [a]) -> [a] -> [a]
 onInit = reversify . onTail . reversify
+
+pregSplitNonRegex :: Ast -> Transformed Ast
+pregSplitNonRegex = modAll $ \ a -> case a of
+  ROnlyValFunc _c@(Right (Const [] "preg_split")) w (Right (arg0:args)) ->
+    if length args `elem` [1, 2]
+      then
+        case arg0 of
+          WSCap w1 (Left (ExprStrLit (StrLit s))) w2 ->
+            if any regexUnitIsMeta sRegexUnits
+              then transfNothing
+              else pure . ROnlyValFunc c' w $ Right (arg0':args)
+            where
+            (sIsDub, sUnits) = strToUnits s
+            (_, sRegexUnits) = regexUnits $ map normalizeStrUnit sUnits
+            c' = Right (Const [] "explode")
+            arg0' = WSCap w1 (strToArg s') w2
+            s' = strUnitsToStr (sIsDub, map last sRegexUnits)
+          _ -> transfNothing
+      else transfNothing
+  _ -> transfNothing
+
+regexUnitIsMeta [c] = normedStrUnitIsRegexMeta c
+regexUnitIsMeta ["\\\\", c] = not $ normedStrUnitIsRegexMeta c
+
+-- e.g. "." and "\x2E" in a PHP str both count as any-char for preg stuff
+normedStrUnitIsRegexMeta :: String -> Bool
+normedStrUnitIsRegexMeta u = any (== phpOrd u) $ map ord "\\|^$*+?.()[{"
+
+strToArg :: String -> Either Expr b
+strToArg = Left . ExprStrLit . StrLit
 

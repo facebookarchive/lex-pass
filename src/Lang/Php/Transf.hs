@@ -6,6 +6,7 @@ import Lang.Php.Ast.Common
 import Lang.Php.Ast.Stmt
 import Lang.Php.Ast.StmtTypes
 import LexPassUtil
+import Numeric
 import qualified Data.Intercal as IC
 
 -- ignores single-statement if/etc blocks currently
@@ -70,4 +71,67 @@ lastLine :: WS -> WS
 lastLine ws = case lastIndent ws of
   (_, [WS s]) -> [WS $ '\n':s]
   _ -> [WS "\n"]
+
+strToUnits :: String -> (Bool, [String])
+strToUnits ('"':rest) = (,) True . strDubToUnits $ init rest
+  where
+  strDubToUnits ('\\':c:rest) =
+    if c `elem` "nrtv\"\\$"
+      then ('\\':[c]) : strDubToUnits rest
+      else
+        if c == 'x'
+          then
+            let (ds, rest') = spanUpToN 2 isHexDigit rest in
+            ('\\':c:ds) : strDubToUnits rest'
+          else
+            if isOctDigit c
+              then
+                let (ds, rest') = spanUpToN 2 isOctDigit rest in
+                ('\\':c:ds) : strDubToUnits rest'
+              else "\\" : [c] : strDubToUnits rest
+  strDubToUnits (c:rest) = [c] : strDubToUnits rest
+  strDubToUnits [] = []
+strToUnits ('\'':rest) = (,) False . strSingToUnits $ init rest
+  where
+  strSingToUnits ('\\':'\\':rest) = "\\" : strSingToUnits rest
+  strSingToUnits ('\\':'\'':rest) = "'" : strSingToUnits rest
+  strSingToUnits (c:rest) = [c] : strSingToUnits rest
+  strSingToUnits [] = []
+
+spanUpToN :: Int -> (a -> Bool) -> [a] -> ([a], [a])
+spanUpToN 0 _ a = ([], a)
+spanUpToN _ f [] = ([], [])
+spanUpToN n f a@(x:l) =
+  if f x then first (x :) $ spanUpToN (n - 1) f l else ([], a)
+
+strUnitsToStr :: (Bool, [String]) -> String
+strUnitsToStr (isDub, s) = [q] ++ concat s ++ [q] where
+  q = if isDub then '"' else '\''
+
+-- i.e. "\lol" -> "\\lol"
+normalizeStrUnit :: String -> String
+normalizeStrUnit "\\" = "\\\\"
+normalizeStrUnit ('\\':'X':rest) = normalizeStrUnit ('\\':'x':rest)
+normalizeStrUnit ('\\':'x':rest) = "\\x" ++ map toUpper rest
+normalizeStrUnit c = c
+
+-- note: only works on normalized str units
+regexUnits :: [String] -> (Int, [[String]])
+regexUnits (c:rest) = (i, regexUnitsDelim i $ init rest) where
+  i = phpOrd c
+  regexUnitsDelim :: Int -> [String] -> [[String]]
+  regexUnitsDelim delim (b@"\\\\":u:rest) = [b, u] : regexUnitsDelim delim rest
+  regexUnitsDelim delim (u:rest) = [u] : regexUnitsDelim delim rest
+  regexUnitsDelim _ [] = []
+
+phpOrd :: String -> Int
+phpOrd "\\t" = ord '\t'
+phpOrd "\\n" = ord '\n'
+phpOrd "\\v" = ord '\v'
+phpOrd "\\r" = ord '\r'
+phpOrd "\\$" = ord '$'
+phpOrd "\\\\" = ord '\\'
+phpOrd [c] = ord c
+phpOrd ('\\':'x':rest) = fst . head $ readHex rest
+phpOrd ('\\':rest) = fst . head $ readOct rest
 
