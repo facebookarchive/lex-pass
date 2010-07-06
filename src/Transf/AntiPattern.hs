@@ -101,12 +101,17 @@ pregSplitNonRegex = modAll $ \ a -> case a of
       else transfNothing
   _ -> transfNothing
 
+regexUnitIsMeta :: [String] -> Bool
 regexUnitIsMeta [c] = normedStrUnitIsRegexMeta c
-regexUnitIsMeta ["\\\\", c] = not $ normedStrUnitIsRegexMeta c
+regexUnitIsMeta ["\\\\", c] = isAlphaNum . chr $ phpOrd c
 
--- e.g. "." and "\x2E" in a PHP str both count as any-char for preg stuff
+-- note that "." and "\x2E" in a PHP str both count as any-char for
+-- preg stuff
 normedStrUnitIsRegexMeta :: String -> Bool
-normedStrUnitIsRegexMeta u = any (== phpOrd u) $ map ord "\\|^$*+?.()[{"
+normedStrUnitIsRegexMeta u = any (== chr (phpOrd u)) "\\|^$*+?.()[{"
+
+normedStrUnitIsRegexUnmetaEvenEscaped :: String -> Bool
+normedStrUnitIsRegexUnmetaEvenEscaped u = any (== phpOrd u) $ map ord "]}"
 
 strToArg :: String -> Either Expr b
 strToArg = Left . ExprStrLit . StrLit
