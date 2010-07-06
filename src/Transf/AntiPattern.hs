@@ -85,8 +85,8 @@ pregSplitNonRegex = modAll $ \ a -> case a of
                       else transfNothing
                   else
                     if any regexUnitIsMeta sRegexUnits
-                      then pure . ROnlyValFunc cExplode w $ Right (arg0':args)
-                      else transfNothing
+                      then transfNothing
+                      else pure . ROnlyValFunc cExplode w $ Right (arg0':args)
               else transfNothing
             where
             (sIsDub, sUnits) = strToUnits s
