@@ -110,9 +110,6 @@ regexUnitIsMeta ["\\\\", c] = isAlphaNum . chr $ phpOrd c
 normedStrUnitIsRegexMeta :: String -> Bool
 normedStrUnitIsRegexMeta u = any (== chr (phpOrd u)) "\\|^$*+?.()[{"
 
-normedStrUnitIsRegexUnmetaEvenEscaped :: String -> Bool
-normedStrUnitIsRegexUnmetaEvenEscaped u = any (== phpOrd u) $ map ord "]}"
-
 strToArg :: String -> Either Expr b
 strToArg = Left . ExprStrLit . StrLit
 
