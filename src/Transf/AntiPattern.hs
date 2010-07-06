@@ -108,7 +108,7 @@ regexUnitIsMeta ["\\\\", c] = isAlphaNum . chr $ phpOrd c
 -- note that "." and "\x2E" in a PHP str both count as any-char for
 -- preg stuff
 normedStrUnitIsRegexMeta :: String -> Bool
-normedStrUnitIsRegexMeta u = any (== chr (phpOrd u)) "\\|^$*+?.()[{"
+normedStrUnitIsRegexMeta u = any (== chr (phpOrd u)) "|^$*+?.()[{"
 
 strToArg :: String -> Either Expr b
 strToArg = Left . ExprStrLit . StrLit
