@@ -13,10 +13,6 @@ import Text.ParserCombinators.Parsec.Expr
 
 type Oper a = Operator Char () a
 
-instance Applicative (GenParser Char ()) where
-  pure = return
-  (<*>) = ap
-
 class Parse a where
   parse :: Parser a
 

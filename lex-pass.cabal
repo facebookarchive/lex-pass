@@ -20,7 +20,7 @@ executable lex-pass
   hs-source-dirs: src
   main-is:        Main.hs
   build-depends:  FUtil, HSH >= 2, MissingH, base >= 4, binary, bytestring,
-                  containers, derive, directory, filepath, mtl, parsec == 2.*,
+                  containers, derive, directory, filepath, mtl, parsec == 3.*,
                   process, syb
   ghc-options:    -threaded
 
@@ -30,6 +30,6 @@ executable lex-pass-test
   hs-source-dirs: src
   main-is:        Lang/Php/Ast/Test.hs
   build-depends:  FUtil, HSH >= 2, base >= 4, binary, bytestring, containers,
-                  derive, directory, filepath, mtl, parsec == 2.*, process, syb
+                  derive, directory, filepath, mtl, parsec == 3.*, process, syb
   ghc-options:    -threaded
 

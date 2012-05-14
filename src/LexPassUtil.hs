@@ -17,6 +17,8 @@ import System.IO
 import System.Process
 import qualified Data.Intercal as IC
 
+import Text.Parsec.Prim(Parsec)
+
 --
 -- transf framework
 --
@@ -164,6 +166,7 @@ modAll f = stateToTransformer (everywhereM (mkM $ transformerToState f))
 astPath :: FilePath -> FilePath -> FilePath
 astPath codeDir subPath = codeDir </> ".ast" </> subPath ++ ".ast"
 
+transfModsFile :: Parsec s (Bool, b) ()
 transfModsFile = updateState ((,) True . snd)
 
 -- combine these into AnAst?
