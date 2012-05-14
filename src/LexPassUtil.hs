@@ -7,6 +7,7 @@ import Control.Monad.State
 import Data.Binary
 import Data.Data
 import Data.Generics
+import Data.String
 import FUtil
 import HSH
 import Lang.Php.Ast
@@ -177,7 +178,7 @@ parseAndCache cacheAsts codeDir subPath = do
     astFilename = astPath codeDir subPath
     regen = do
       hPutStrLn stderr "- Parsing"
-      c <- readFileStrict $ codeDir </> subPath
+      c <- readFile $ codeDir </> subPath
       case runParser parse () subPath c of
         Left err -> error $ show err
         Right ast -> do
@@ -196,7 +197,7 @@ parseAndCache cacheAsts codeDir subPath = do
         else regen
     else do
       hPutStrLn stderr "- Parsing (always)"
-      c <- readFileStrict $ codeDir </> subPath
+      c <- readFile $ codeDir </> subPath
       return $ case runParser parse () subPath c of
         Left err -> error $ show err
         Right ast -> ast
