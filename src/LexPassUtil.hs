@@ -78,7 +78,7 @@ lexPass transf opts codeDir subPath total cur = do
       return (False, infoLines)
     Transformed {infoLines = infoLines, transfResult = Just ast'} -> io $ do
       hPutStrLn stderr "- Saving"
-      writeFile (codeDir </> subPath) $ unparse ast'
+      writeSrcFile (codeDir </> subPath) $ unparse ast'
       encodeFile (astPath codeDir subPath) ast'
       return (True, infoLines)
 
@@ -176,12 +176,11 @@ transfModsFile = updateState ((,) True . snd)
 --   work at the byte level, which may be best for performance anyway.
 -- - But all the parsing stuff uses String right now, so I'm hackily
 --   shoving byte streams into Strings for now.
--- - This approach also means that files are saved as UTF8.  (So the
---   WordPress file "©" is corrected to UTF8.)  I'm fine with that for now.
---   In the future we might want to work purely at the byte level to
---   support other encodings and to be fast..
 readSrcFile :: FilePath -> IO String
 readSrcFile f = BSC.unpack <$> BSC.readFile f
+
+writeSrcFile :: FilePath -> String -> IO ()
+writeSrcFile f = BSC.writeFile f . BSC.pack
 
 -- combine these into AnAst?
 parseAndCache :: (Binary a, Parse a, Unparse a) =>
