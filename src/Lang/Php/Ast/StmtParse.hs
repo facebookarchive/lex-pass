@@ -140,6 +140,7 @@ instance Unparse If where
     doElsery (Just ws) = tokElse ++ unparse ws ++ tokIf
     doIfelse ((ws, elsery), condAndBlock) =
       unparse ws ++ doElsery elsery ++ unparse condAndBlock
+    unparseColon :: StmtOrBlock -> [Tok]
     unparseColon = unparse
 {-
     unparseColon (Left (Block body)) = if isColon
