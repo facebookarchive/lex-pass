@@ -233,6 +233,7 @@ ifCondP = liftM3 WSCap parse (tokLParenP >> parse <* tokRParenP) parse
 
 instance Parse (If, WS) where
   parse = tokIfP >> do
+    {-
     cond <- ifCondP
     let
       colonIf = do
@@ -242,6 +243,21 @@ instance Parse (If, WS) where
         (ifBlock1, w) <- first (IfBlock cond) <$> parse
         ifRestP False $ IC.Interend (ifBlock1, w)
     (tokColonP >> colonIf) <|> normalIf
+    -}
+    (isColon, ifBlockAndW) <- ifBlockP
+    ifRestP isColon $ IC.Interend ifBlockAndW
+
+ifBlockP :: Parser (Bool, (IfBlock, WS))
+ifBlockP = do
+  cond <- ifCondP
+  let
+    colonIf = do
+      body <- stmtListP
+      return (True, (IfBlock cond (Right $ Block body), []))
+    normalIf = do
+      (ifBlock1, w) <- first (IfBlock cond) <$> parse
+      return (False, (ifBlock1, w))
+  (tokColonP >> colonIf) <|> normalIf
 
 instance Parse (IfBlock, WS) where
   parse = do
@@ -261,8 +277,8 @@ ifRestP isColon soFar =
 elseifContP :: Bool -> IC.Intercal (IfBlock, WS) (Maybe WS) -> Parser (If, WS)
 elseifContP isColon soFar = tokElseifP >> do
   soFar' <- (\ x -> IC.append Nothing x soFar) <$> if isColon
-    then (\ x -> (Block x, [])) <$> stmtListP
-    else parse
+    then parse -- (\ x -> (Block x, [])) <$> stmtListP
+    else (parse :: Parser (IfBlock, WS))
   ifRestP isColon soFar'
 
 elseContP :: Bool -> IC.Intercal (IfBlock, WS) (Maybe WS) -> Parser (If, WS)
