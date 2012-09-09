@@ -131,15 +131,26 @@ argsUnparser :: (Unparse t, Unparse s) => Either t [s] -> String
 argsUnparser = either unparse (intercalate tokComma . map unparse)
 
 instance Unparse If where
-  unparse (If ifAndIfelses theElse) = tokIf ++ unparse theIf ++
+  unparse (If isColon ifAndIfelses theElse) = tokIf ++ unparse theIf ++
     concatMap doIfelse ifelses ++
-    maybe [] (\ (w1, block) -> w2With tokElse w1 ++ unparse block) theElse
+    maybe [] (\ (w1, block) -> w2With tokElse w1 ++ unparseColon block) theElse
     where
     (theIf, ifelses) = IC.breakStart ifAndIfelses
     doElsery Nothing = tokElseif
     doElsery (Just ws) = tokElse ++ unparse ws ++ tokIf
     doIfelse ((ws, elsery), condAndBlock) =
       unparse ws ++ doElsery elsery ++ unparse condAndBlock
+    unparseColon = unparse
+{-
+    unparseColon (Left (Block body)) = if isColon
+      then tokColon ++ unparse body
+      else unparse (Block body)
+    unparseColon (Right stmt) = if isColon
+      -- We could just unparse the statement (which should be a one-statement
+      -- block).  But it's probably better to yell on this invariant violation.
+      then error "Colon notation should only use blocks."
+      else unparse stmt
+-}
 
 instance Unparse IfBlock where
   unparse (IfBlock (WSCap w1 expr w2) block) = concat [unparse w1, tokLParen,
@@ -184,8 +195,8 @@ instance Unparse While where
   unparse (While (WSCap w1 expr w2) block) = concat [tokWhile, unparse w1,
     tokLParen, unparse expr, tokRParen, unparse w2, unparse block]
 
-stmtListParser :: Parser StmtList
-stmtListParser = liftM2 IC.unbreakStart parse parse
+stmtListP :: Parser StmtList
+stmtListP = liftM2 IC.unbreakStart parse parse
 
 instance Parse (Stmt, WS) where
   parse =
@@ -220,45 +231,61 @@ simpleStmtParser =
     (tokUnsetP >> liftM3 WSCap parse (issetListParser parse) parse)
     parse
 
+ifCondP :: Parser (WSCap2 Expr)
+ifCondP = liftM3 WSCap parse (tokLParenP >> parse <* tokRParenP) parse
+
 instance Parse (If, WS) where
   parse = tokIfP >> do
-    (b, w) <- parse
-    ifRestP $ IC.Interend (b, w)
+    cond <- ifCondP
+    let
+      colonIf = do
+        body <- stmtListP
+        ifRestP True $ IC.Interend (IfBlock cond (Right $ Block body), [])
+      normalIf = do
+        (ifBlock1, w) <- first (IfBlock cond) <$> parse
+        ifRestP False $ IC.Interend (ifBlock1, w)
+    (tokColonP >> colonIf) <|> normalIf
 
-ifRestP :: IC.Intercal (IfBlock, WS) (Maybe WS) -> Parser (If, WS)
-ifRestP a = elseifContP a <|> elseContP a <|> return (If a' Nothing, w) where
+instance Parse (IfBlock, WS) where
+  parse = do
+    cond <- ifCondP
+    first (IfBlock cond) <$> parse
+
+ifRestP :: Bool -> IC.Intercal (IfBlock, WS) (Maybe WS) -> Parser (If, WS)
+ifRestP isColon a =
+  elseifContP isColon a <|>
+  elseContP isColon a <|>
+  (when isColon (tokEndifP >> return ()) >> return (If isColon a' Nothing, w))
+  where
   (a', w) = ifReconstr a
 
-elseifContP :: IC.Intercal (IfBlock, WS) (Maybe WS) -> Parser (If, WS)
-elseifContP a = tokElseifP >> do
+elseifContP :: Bool -> IC.Intercal (IfBlock, WS) (Maybe WS) -> Parser (If, WS)
+elseifContP isColonXXX a = tokElseifP >> do
   a' <- (\ x -> IC.append Nothing x a) <$> parse
-  ifRestP a'
+  ifRestP isColonXXX a'
 
-elseContP :: IC.Intercal (IfBlock, WS) (Maybe WS) -> Parser (If, WS)
-elseContP a = tokElseP >> do
+elseContP :: Bool -> IC.Intercal (IfBlock, WS) (Maybe WS) -> Parser (If, WS)
+elseContP isColonXXX a = tokElseP >> do
   w <- parse
-  elseIfContP a w <|> elseEndP a w
+  elseIfContP isColonXXX a w <|> elseEndP isColonXXX a w
 
-elseIfContP :: IC.Intercal (IfBlock, WS) (Maybe WS) -> WS -> Parser (If, WS)
-elseIfContP a w = tokIfP >> do
+elseIfContP :: Bool -> IC.Intercal (IfBlock, WS) (Maybe WS) -> WS ->
+  Parser (If, WS)
+elseIfContP isColonXXX a w = tokIfP >> do
   a' <- (\ x -> IC.append (Just w) x a) <$> parse
-  ifRestP a'
+  ifRestP isColonXXX a'
 
-elseEndP :: IC.Intercal (IfBlock, WS) (Maybe WS) -> WS -> Parser (If, WS)
-elseEndP a w2 = do
+elseEndP :: Bool -> IC.Intercal (IfBlock, WS) (Maybe WS) -> WS ->
+  Parser (If, WS)
+elseEndP isColonXXX a w2 = do
   let (a', w1) = ifReconstr a
   (block, wEnd) <- parse
-  return (If a' $ Just ((w1, w2), block), wEnd)
+  return (If False a' $ Just ((w1, w2), block), wEnd)
 
 ifReconstr :: IC.Intercal (IfBlock, WS) (Maybe WS) ->
   (IC.Intercal IfBlock (WS, Maybe WS), WS)
 ifReconstr a = (IC.unbreakEnd (map rePairRight main) ifBlockLast, w) where
   (main, (ifBlockLast, w)) = IC.breakEnd a
-
-instance Parse (IfBlock, WS) where
-  parse = do
-    e <- liftM3 WSCap parse (tokLParenP >> parse <* tokRParenP) parse
-    first (IfBlock e) <$> parse
 
 tryParser :: Parser (Stmt, WS)
 tryParser = tokTryP >> do
@@ -439,7 +466,7 @@ instance Parse Switch where
 instance Parse Case where
   parse = liftM2 Case
     ((tokDefaultP >> Left <$> parse) <|> (tokCaseP >> Right <$> parse))
-    ((tokColonP <|> tokSemiP) >> stmtListParser)
+    ((tokColonP <|> tokSemiP) >> stmtListP)
 
 instance Parse (While, WS) where
   parse = tokWhileP >> do
@@ -447,7 +474,7 @@ instance Parse (While, WS) where
     first (While e) <$> parse
 
 instance Parse (a, WS) => Parse (Block a) where
-  parse = tokLBraceP >> Block <$> liftM2 IC.unbreakStart parse parse <*
+  parse = tokLBraceP >> Block <$> liftM2 IC.unbreakStart parse parse <* 
     tokRBraceP
 
 instance Parse TopLevel where

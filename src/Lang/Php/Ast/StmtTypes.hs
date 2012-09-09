@@ -133,6 +133,8 @@ data Foreach = Foreach {
   deriving (Eq, Show, Typeable, Data)
 
 data If = If {
+  -- And when ifAltColonSyntax is True, all the BlockOrStmts must be Blocks.
+  ifAltColonSyntax :: Bool,
   ifAndIfelses :: IC.Intercal IfBlock (WS, Maybe WS),
   ifElse       :: Maybe (WS2, BlockOrStmt)}
   deriving (Eq, Show, Typeable, Data)

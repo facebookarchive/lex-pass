@@ -27,7 +27,7 @@ instance Unparse Ast where
   unparse (Ast t s) = unparse t ++ unparse s
 
 instance Parse Ast where
-  parse = liftM2 Ast parse stmtListParser
+  parse = liftM2 Ast parse stmtListP
 
 $(derive makeBinary ''Ast)
 
