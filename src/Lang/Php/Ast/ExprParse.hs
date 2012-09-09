@@ -36,6 +36,8 @@ instance Unparse LRVal where
     unparse e ++ tokRBracket
   unparse (LRValMemb v (ws1, ws2) m) =
     unparse v ++ unparse ws1 ++ tokArrow ++ unparse ws2 ++ unparse m
+  unparse (LRValStaMemb v (ws1, ws2) m) =
+    unparse v ++ unparse ws1 ++ tokDubColon ++ unparse ws2 ++ unparse m
 
 instance Unparse LOnlyVal where
   unparse (LOnlyValList w args) = tokList ++ unparse w ++ tokLParen ++
@@ -97,7 +99,7 @@ dynConstOrConstParser :: Parser (Either DynConst Const, WS)
 dynConstOrConstParser = do
   (statics, cOrD) <-
     first (map (\ ((a, b), c) -> (a, (b, c)))) <$>
-    parseABPairsUntilAOrC (liftM2 (,) identifierParser parse)
+    parseABPairsUntilAOrC (liftM2 (,) (tokStaticP <|> identifierParser) parse)
     (tokDubColonP >> parse) parse
   return $ case cOrD of
     Left c -> first (Right . Const statics) c
@@ -175,10 +177,14 @@ valExtend v@(state, ws) = case state of
     <|> return v
 
 valExtendMemb :: RVal -> WS -> Parser (Val, WS)
-valExtendMemb a ws = tokArrowP >> do
+valExtendMemb a ws = (tokArrowP >> do
   ws2 <- parse
   (memb, wsEnd) <- parse
-  valExtend (ValLRVal $ LRValMemb a (ws, ws2) memb, wsEnd)
+  valExtend (ValLRVal $ LRValMemb a (ws, ws2) memb, wsEnd))
+		<|> (tokDubColonP >> do
+		  ws2 <- parse
+		  (memb, wsEnd) <- parse
+		  valExtend (ValLRVal $ LRValStaMemb a (ws, ws2) memb, wsEnd))
 
 instance Parse (Memb, WS) where
   parse =

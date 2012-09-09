@@ -205,6 +205,7 @@ simpleStmtParser =
   StmtDeclare <$> parse <|>
   StmtDoWhile <$> parse <|>
   liftM2 StmtEcho (tokEchoP >> sepBy1 parse tokCommaP) parse <|>
+  (try $ liftM2 StmtStatic (tokStaticP >> sepBy1 parse tokCommaP) parse) <|>
   liftM2 (uncurry StmtExpr) parse parse <|>
   StmtFuncDef <$> parse <|>
   liftM2 StmtGlobal (tokGlobalP >> sepBy1 parse tokCommaP) parse <|>
@@ -213,7 +214,6 @@ simpleStmtParser =
   StmtInterface <$> parse <|>
   StmtNothing <$> parse <|>
   liftM3 StmtReturn (tokReturnP >> parse) (optionMaybe parse) parse <|>
-  liftM2 StmtStatic (tokStaticP >> sepBy1 parse tokCommaP) parse <|>
   StmtSwitch <$> parse <|>
   liftM2 StmtThrow (tokThrowP >> parse) parse <|>
   liftM2 StmtUnset
