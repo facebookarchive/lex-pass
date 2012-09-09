@@ -140,18 +140,14 @@ instance Unparse If where
     doElsery (Just ws) = tokElse ++ unparse ws ++ tokIf
     doIfelse ((ws, elsery), condAndBlock) =
       unparse ws ++ doElsery elsery ++ unparse condAndBlock
-    unparseColon :: StmtOrBlock -> [Tok]
-    unparseColon = unparse
-{-
-    unparseColon (Left (Block body)) = if isColon
+    unparseColon (Right (Block body)) = if isColon
       then tokColon ++ unparse body
       else unparse (Block body)
-    unparseColon (Right stmt) = if isColon
+    unparseColon (Left stmt) = if isColon
       -- We could just unparse the statement (which should be a one-statement
       -- block).  But it's probably better to yell on this invariant violation.
       then error "Colon notation should only use blocks."
       else unparse stmt
--}
 
 instance Unparse IfBlock where
   unparse (IfBlock (WSCap w1 expr w2) block) = concat [unparse w1, tokLParen,
