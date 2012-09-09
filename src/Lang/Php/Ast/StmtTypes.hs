@@ -25,6 +25,7 @@ data Stmt =
   StmtGlobal    [WSCap Var] StmtEnd           |
   StmtIf        If |
   StmtInterface Interface                     |
+  StmtNamespace (WSCap Namespace) StmtEnd     |
   StmtNothing   StmtEnd                       |
   StmtReturn    WS (Maybe (Expr, WS)) StmtEnd |
   -- this list must have at least one element.. should i make a type for that?
@@ -33,12 +34,19 @@ data Stmt =
   StmtThrow     (WSCap Expr) StmtEnd          |
   StmtTry       (WSCap (Block Stmt)) (IC.Intercal Catch WS) |
   StmtUnset     (WSCap [WSCap LRVal]) StmtEnd   |
+  StmtUse       (WSCap Use) StmtEnd     |
   StmtWhile     While
   deriving (Eq, Show, Typeable, Data)
 
 -- a block has {}'s, so one-liner's are not considered blocks
 -- and a (Block Stmt) is not the same as a StmtList tho it has the same ast
 data Block a = Block (IC.Intercal WS a)
+  deriving (Eq, Show, Typeable, Data)
+
+data Namespace = Namespace String
+  deriving (Eq, Show, Typeable, Data)
+
+data Use = Use String
   deriving (Eq, Show, Typeable, Data)
 
 data Func = Func {
@@ -181,10 +189,12 @@ $(derive makeBinary ''If)
 $(derive makeBinary ''IfaceStmt)
 $(derive makeBinary ''IfBlock)
 $(derive makeBinary ''Interface)
+$(derive makeBinary ''Namespace)
 $(derive makeBinary ''Stmt)
 $(derive makeBinary ''StmtEnd)
 $(derive makeBinary ''Switch)
 $(derive makeBinary ''TopLevel)
+$(derive makeBinary ''Use)
 $(derive makeBinary ''VarMbVal)
 $(derive makeBinary ''VarEqVal)
 $(derive makeBinary ''While)

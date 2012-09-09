@@ -30,6 +30,7 @@ instance Unparse Stmt where
       intercalate tokComma (map unparse a) ++ unparse end
     StmtIf a -> unparse a
     StmtInterface a -> unparse a
+    StmtNamespace n end -> tokNamespace ++ unparse n ++ unparse end
     StmtNothing end -> unparse end
     StmtReturn rMb w end -> tokReturn ++ unparse rMb ++ unparse w ++
       unparse end
@@ -41,6 +42,7 @@ instance Unparse Stmt where
     StmtUnset (WSCap w1 a w2) end -> tokUnset ++ unparse w1 ++ tokLParen ++
       intercalate tokComma (map unparse a) ++ tokRParen ++ unparse w2 ++
       unparse end
+    StmtUse n end -> tokUse ++ unparse n ++ unparse end
     StmtWhile a -> unparse a
 
 instance Unparse StmtEnd where
@@ -153,6 +155,12 @@ instance Unparse IfaceStmt where
   unparse (IfaceConst vars) = cStmtConstUnparser vars
   unparse (IfaceFunc a) = unparse a
 
+instance Unparse Namespace where
+    unparse (Namespace n) = n
+
+instance Unparse Use where
+  unparse (Use n) = n
+
 instance Unparse VarMbVal where
   unparse (VarMbVal var exprMb) = unparse var ++ maybe []
     (\ (w, expr) -> w2With tokEquals w ++ unparse expr) exprMb
@@ -200,6 +208,8 @@ simpleStmtParser =
   liftM2 (uncurry StmtExpr) parse parse <|>
   StmtFuncDef <$> parse <|>
   liftM2 StmtGlobal (tokGlobalP >> sepBy1 parse tokCommaP) parse <|>
+  liftM2 StmtNamespace (tokNamespaceP >> parse) parse <|>
+  liftM2 StmtUse (tokUseP >> parse) parse <|>
   StmtInterface <$> parse <|>
   StmtNothing <$> parse <|>
   liftM3 StmtReturn (tokReturnP >> parse) (optionMaybe parse) parse <|>
@@ -404,6 +414,16 @@ instance Parse Interface where
     parse
     ((tokExtendsP >> sepBy1 parse tokCommaP) <|> return [])
     parse
+
+instance Parse Namespace where
+    parse = do
+	n <- identifierParser
+	return $ Namespace n
+
+instance Parse Use where
+    parse = do
+      n <- identifierParser
+      return $ Use n
 
 instance Parse IfaceStmt where
   parse =
