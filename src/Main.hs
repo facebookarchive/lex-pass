@@ -35,10 +35,10 @@ usage err =
   error $ err ++ usageInfo header options ++
     "Transformers are:\n" ++ intercalate "\n" (sort $ map showTransf transfs)
   where
-  header =
-    "usage: [<options>] <transformer> <transformer-options ..>\n\
-    \Runs <transformer> on lexed codebase files.\n\
-    \Options are:"
+  header = unlines [
+    "usage: [<options>] <transformer> <transformer-options ..>",
+    "Runs <transformer> on lexed codebase files.",
+    "Options are:"]
   showTransf :: Transf -> String
   showTransf t = "" ++ transfName t ++ transfArgs t ++ "\n" ++
     intercalate "\n" (zipWith (++) (repeat "  ") .

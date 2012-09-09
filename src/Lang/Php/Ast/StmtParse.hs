@@ -265,8 +265,8 @@ ifRestP isColon soFar =
   elseifContP isColon soFar <|>
   elseContP isColon soFar <|>
   do
-    w' <- if isColon then tokEndifP *> ((w ++) <$> parse) else return w
-    return (If isColon soFar' Nothing, w')
+    w' <- if isColon then tokEndifP >> (parse :: Parser WS) else return []
+    return (If isColon soFar' Nothing, w ++ w')
   where
   (soFar', w) = ifReconstr soFar
 
