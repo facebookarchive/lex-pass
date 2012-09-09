@@ -249,17 +249,21 @@ instance Parse (IfBlock, WS) where
     first (IfBlock cond) <$> parse
 
 ifRestP :: Bool -> IC.Intercal (IfBlock, WS) (Maybe WS) -> Parser (If, WS)
-ifRestP isColon a =
-  elseifContP isColon a <|>
-  elseContP isColon a <|>
-  (when isColon (tokEndifP >> return ()) >> return (If isColon a' Nothing, w))
+ifRestP isColon soFar =
+  elseifContP isColon soFar <|>
+  elseContP isColon soFar <|>
+  do
+    when isColon $ tokEndifP >> return ()
+    return (If isColon soFar' Nothing, w)
   where
-  (a', w) = ifReconstr a
+  (soFar', w) = ifReconstr soFar
 
 elseifContP :: Bool -> IC.Intercal (IfBlock, WS) (Maybe WS) -> Parser (If, WS)
-elseifContP isColonXXX a = tokElseifP >> do
-  a' <- (\ x -> IC.append Nothing x a) <$> parse
-  ifRestP isColonXXX a'
+elseifContP isColon soFar = tokElseifP >> do
+  soFar' <- (\ x -> IC.append Nothing x soFar) <$> if isColon
+    then (\ x -> (Block x, [])) <$> stmtListP
+    else parse
+  ifRestP isColon soFar'
 
 elseContP :: Bool -> IC.Intercal (IfBlock, WS) (Maybe WS) -> Parser (If, WS)
 elseContP isColonXXX a = tokElseP >> do
