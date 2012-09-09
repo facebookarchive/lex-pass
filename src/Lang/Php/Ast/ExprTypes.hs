@@ -43,9 +43,10 @@ data DynConst = DynConst [(String, WS2)] Var -- "a::$a"
   deriving (Eq, Show, Typeable, Data)
 
 data LRVal =
-  LRValVar  DynConst |
-  LRValInd  RVal WS (WSCap Expr) | -- "$a->a[0]"
-  LRValMemb RVal WS2 Memb -- $a->a
+  LRValVar     DynConst |
+  LRValInd     RVal WS (WSCap Expr) | -- "$a->a[0]"
+  LRValMemb    RVal WS2 Memb | -- $a->a
+  LRValStaMemb RVal WS2 Memb -- $a::a
   deriving (Eq, Show, Typeable, Data)
 
 data LOnlyVal =
