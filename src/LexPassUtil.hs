@@ -15,9 +15,9 @@ import System.Directory
 import System.FilePath
 import System.IO
 import System.Process
+import Text.Parsec.Prim (Parsec)
+import qualified Data.ByteString.Char8 as BSC
 import qualified Data.Intercal as IC
-
-import Text.Parsec.Prim(Parsec)
 
 --
 -- transf framework
@@ -169,6 +169,20 @@ astPath codeDir subPath = codeDir </> ".ast" </> subPath ++ ".ast"
 transfModsFile :: Parsec s (Bool, b) ()
 transfModsFile = updateState ((,) True . snd)
 
+-- - When we read a source file it must be done strictly since we also
+--   overwrite the files in place when transforming.
+-- - Unfortunately there are PHP files that are not UTF8.  For example
+--   WordPress uses a bare 0xA9 byte for "©".  So we probably have to just
+--   work at the byte level, which may be best for performance anyway.
+-- - But all the parsing stuff uses String right now, so I'm hackily
+--   shoving byte streams into Strings for now.
+-- - This approach also means that files are saved as UTF8.  (So the
+--   WordPress file "©" is corrected to UTF8.)  I'm fine with that for now.
+--   In the future we might want to work purely at the byte level to
+--   support other encodings and to be fast..
+readSrcFile :: FilePath -> IO String
+readSrcFile f = BSC.unpack <$> BSC.readFile f
+
 -- combine these into AnAst?
 parseAndCache :: (Binary a, Parse a, Unparse a) =>
   Bool -> FilePath -> FilePath -> IO a
@@ -177,7 +191,7 @@ parseAndCache cacheAsts codeDir subPath = do
     astFilename = astPath codeDir subPath
     regen = do
       hPutStrLn stderr "- Parsing"
-      c <- readFileStrict $ codeDir </> subPath
+      c <- readSrcFile $ codeDir </> subPath
       case runParser parse () subPath c of
         Left err -> error $ show err
         Right ast -> do
@@ -196,7 +210,7 @@ parseAndCache cacheAsts codeDir subPath = do
         else regen
     else do
       hPutStrLn stderr "- Parsing (always)"
-      c <- readFileStrict $ codeDir </> subPath
+      c <- readSrcFile $ codeDir </> subPath
       return $ case runParser parse () subPath c of
         Left err -> error $ show err
         Right ast -> ast
