@@ -243,6 +243,12 @@ instance Parse (If, WS) where
     (isColon, ifBlockAndW) <- ifBlockP
     ifRestP isColon $ IC.Interend ifBlockAndW
 
+-- | Parse the first conditional and block of an "if" control structure.
+-- Returns:
+-- - True iff the control structure uses the alternative colon-based
+-- syntax
+-- - the conditional and block
+-- - any immediately trailing whitespace
 ifBlockP :: Parser (Bool, (IfBlock, WS))
 ifBlockP = do
   cond <- ifCondP
@@ -260,16 +266,20 @@ instance Parse (IfBlock, WS) where
     cond <- ifCondP
     first (IfBlock cond) <$> parse
 
+-- | Parse the entire remainder of an "if" control structure given
+-- is-it-colon-syntax and the first conditional-and-block.
 ifRestP :: Bool -> IC.Intercal (IfBlock, WS) (Maybe WS) -> Parser (If, WS)
 ifRestP isColon soFar =
   elseifContP isColon soFar <|>
   elseContP isColon soFar <|>
   do
-    w' <- if isColon then tokEndifP >> (parse :: Parser WS) else return []
+    w' <- if isColon then tokEndifP >> parse else return []
     return (If isColon soFar' Nothing, w ++ w')
   where
   (soFar', w) = ifReconstr soFar
 
+-- | Parse a conditional-and-block ensuring that its colon-syntax-or-not
+-- matches the rest of the "if" control structure.
 ifBlockPCheck :: Bool -> Parser (IfBlock, WS)
 ifBlockPCheck isColon = do
   (isColon', ifBlockAndW) <- ifBlockP
@@ -277,34 +287,43 @@ ifBlockPCheck isColon = do
     fail "You can't mix colon notation in one if block."
   return ifBlockAndW
 
+-- | Parse the rest of an "if" control structure where the next token is
+-- "elseif".
 elseifContP :: Bool -> IC.Intercal (IfBlock, WS) (Maybe WS) -> Parser (If, WS)
 elseifContP isColon soFar = tokElseifP >> do
   ifBlockAndW <- ifBlockPCheck isColon
   ifRestP isColon $ (\ x -> IC.append Nothing x soFar) ifBlockAndW
 
+-- | Parse the rest of an "if" control structure where the next token is
+-- "else".
 elseContP :: Bool -> IC.Intercal (IfBlock, WS) (Maybe WS) -> Parser (If, WS)
 elseContP isColon soFar = tokElseP >> do
   w <- parse
   elseIfContP isColon soFar w <|> elseEndP isColon soFar w
 
+-- | Parse the rest of an "if" control structure where we've just seen
+-- "else"+WS and will now see "if".
 elseIfContP :: Bool -> IC.Intercal (IfBlock, WS) (Maybe WS) -> WS ->
   Parser (If, WS)
 elseIfContP isColon soFar w = tokIfP >> do
   ifBlockAndW <- ifBlockPCheck isColon
   ifRestP isColon $ (\ x -> IC.append (Just w) x soFar) ifBlockAndW
 
+-- | Parse the rest of an "if" control structure where we've just seen
+-- "else"+WS and now there is only the final block.
 elseEndP :: Bool -> IC.Intercal (IfBlock, WS) (Maybe WS) -> WS ->
   Parser (If, WS)
 elseEndP True soFar w2 = do
   let (soFar', w1) = ifReconstr soFar
-  _ <- tokColonP
-  block <- Right . Block <$> stmtListP
-  return (If True soFar' $ Just ((w1, w2), block), [])
+  block <- tokColonP >> Right . Block <$> stmtListP
+  w3 <- tokEndifP >> parse
+  return (If True soFar' $ Just ((w1, w2), block), w3)
 elseEndP False soFar w2 = do
   let (soFar', w1) = ifReconstr soFar
   (block, wEnd) <- parse
   return (If False soFar' $ Just ((w1, w2), block), wEnd)
 
+-- | Regroup a parsed "if" control structure to group WS together.
 ifReconstr :: IC.Intercal (IfBlock, WS) (Maybe WS) ->
   (IC.Intercal IfBlock (WS, Maybe WS), WS)
 ifReconstr a = (IC.unbreakEnd (map rePairRight main) ifBlockLast, w) where
@@ -497,7 +516,7 @@ instance Parse (While, WS) where
     first (While e) <$> parse
 
 instance Parse (a, WS) => Parse (Block a) where
-  parse = tokLBraceP >> Block <$> liftM2 IC.unbreakStart parse parse <* 
+  parse = tokLBraceP >> Block <$> liftM2 IC.unbreakStart parse parse <*
     tokRBraceP
 
 instance Parse TopLevel where

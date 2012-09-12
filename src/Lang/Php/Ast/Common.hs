@@ -1,6 +1,11 @@
-{-# LANGUAGE DeriveDataTypeable, TemplateHaskell, TypeSynonymInstances,
-             FlexibleInstances, FlexibleContexts, OverlappingInstances,
-             UndecidableInstances #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE OverlappingInstances #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 module Lang.Php.Ast.Common (
   module Common,
@@ -17,7 +22,6 @@ module Lang.Php.Ast.Common (
   WS, WS2, WSElem(..), WSCap(..), WSCap2, capify, wsNoNLParser, w2With,
   upToCharsOrEndParser) where
 
-import Common
 import Control.Applicative hiding ((<|>), many, optional, Const)
 import Control.Arrow
 import Control.Monad
@@ -28,12 +32,15 @@ import Data.DeriveTH
 import Data.List
 import Data.Maybe
 import FUtil
+import Text.PrettyPrint.GenericPretty
+
+import Common
 import qualified Data.Intercal as IC
 
 type WS = [WSElem]
 
 data WSElem = WS String | LineComment Bool String | Comment String
-  deriving (Show, Eq, Typeable, Data)
+  deriving (Data, Eq, Generic, Show, Typeable)
 
 type WS2 = (WS, WS)
 
@@ -99,7 +106,7 @@ data WSCap a = WSCap {
   wsCapPre :: WS,
   wsCapMain :: a,
   wsCapPost :: WS}
-  deriving (Show, Eq, Typeable, Data)
+  deriving (Data, Eq, Generic, Show, Typeable)
 
 instance (Unparse a) => Unparse (WSCap a) where
   unparse (WSCap a b c) = concat [unparse a, unparse b, unparse c]
@@ -117,6 +124,9 @@ instance Parse a => Parse (a, WS) where
   parse = liftM2 (,) parse parse
 
 type WSCap2 a = WSCap (WSCap a)
+
+instance Out WSElem
+instance (Out a) => Out (WSCap a)
 
 $(derive makeBinary ''WSElem)
 $(derive makeBinary ''WSCap)

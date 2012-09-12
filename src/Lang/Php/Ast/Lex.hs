@@ -1,12 +1,16 @@
-{-# LANGUAGE DeriveDataTypeable, TemplateHaskell #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Lang.Php.Ast.Lex where
+
+import Text.PrettyPrint.GenericPretty
 
 import Lang.Php.Ast.Common
 import qualified Data.Set as Set
 
 data StrLit = StrLit String
-  deriving (Eq, Show, Typeable, Data)
+  deriving (Data, Eq, Generic, Show, Typeable)
 
 instance Parse StrLit where
   parse = StrLit <$> (
@@ -43,7 +47,7 @@ backticksParser :: Parser String
 backticksParser = liftM2 (:) (char '`') (strLitRestParserCurly '`' False)
 
 data NumLit = NumLit String
-  deriving (Eq, Show, Typeable, Data)
+  deriving (Data, Eq, Generic, Show, Typeable)
 
 instance Parse NumLit where
   -- could be tighter
@@ -58,7 +62,7 @@ instance Unparse NumLit where
   unparse (NumLit a) = a
 
 data HereDoc = HereDoc String
-  deriving (Eq, Show, Typeable, Data)
+  deriving (Data, Eq, Generic, Show, Typeable)
 
 instance Parse HereDoc where
   parse = HereDoc <$> do
@@ -436,6 +440,10 @@ tokChildren = "children"
 tokChildrenP = identCI tokChildren
 tokAttribute = "attribute"
 tokAttributeP = identCI tokAttribute
+
+instance Out HereDoc
+instance Out NumLit
+instance Out StrLit
 
 $(derive makeBinary ''HereDoc)
 $(derive makeBinary ''NumLit)

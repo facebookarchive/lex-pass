@@ -1,5 +1,9 @@
-{-# LANGUAGE DeriveDataTypeable, TemplateHaskell #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE TemplateHaskell #-}
 module Lang.Php.Ast.ExprTypes where
+
+import Text.PrettyPrint.GenericPretty
 
 import Lang.Php.Ast.Common
 import Lang.Php.Ast.Lex
@@ -23,13 +27,13 @@ import qualified Data.Intercal as IC
 -- refactoring.
 
 data Val = ValLOnlyVal LOnlyVal | ValROnlyVal ROnlyVal | ValLRVal LRVal
-  deriving (Eq, Show, Typeable, Data)
+  deriving (Data, Eq, Generic, Show, Typeable)
 
 data LVal = LValLOnlyVal LOnlyVal | LValLRVal LRVal
-  deriving (Eq, Show, Typeable, Data)
+  deriving (Data, Eq, Generic, Show, Typeable)
 
 data RVal = RValROnlyVal ROnlyVal | RValLRVal LRVal
-  deriving (Eq, Show, Typeable, Data)
+  deriving (Data, Eq, Generic, Show, Typeable)
 
 data Var =
   -- In php, indexing is oddly coupled very tightly with being a non-dyn var.
@@ -37,39 +41,39 @@ data Var =
   VarDyn     WS Var          | -- "$$a"
                                -- note: "$$a[0]()->a" == "${$a[0]}()->a"
   VarDynExpr WS (WSCap Expr)   -- "${$a . '_'}"
-  deriving (Eq, Show, Typeable, Data)
+  deriving (Data, Eq, Generic, Show, Typeable)
 
 data DynConst = DynConst [(String, WS2)] Var -- "a::$a"
-  deriving (Eq, Show, Typeable, Data)
+  deriving (Data, Eq, Generic, Show, Typeable)
 
 data LRVal =
   LRValVar     DynConst |
   LRValInd     RVal WS (WSCap Expr) | -- "$a->a[0]"
   LRValMemb    RVal WS2 Memb | -- $a->a
   LRValStaMemb RVal WS2 Memb -- $a::a
-  deriving (Eq, Show, Typeable, Data)
+  deriving (Data, Eq, Generic, Show, Typeable)
 
 data LOnlyVal =
   LOnlyValList   WS (Either WS [Either WS (WSCap LVal)]) |
   LOnlyValAppend LVal WS2                 | -- "$a[]"
   LOnlyValInd    LOnlyVal WS (WSCap Expr) | -- "$a[][0]"
   LOnlyValMemb   LOnlyVal WS2 Memb          -- "$a[]->a"
-  deriving (Eq, Show, Typeable, Data)
+  deriving (Data, Eq, Generic, Show, Typeable)
 
 data Const = Const [(String, WS2)] String -- "a::a"
-  deriving (Eq, Show, Typeable, Data)
+  deriving (Data, Eq, Generic, Show, Typeable)
 
 data ROnlyVal =
   ROnlyValConst Const |
   -- "a()", "$a()"
   ROnlyValFunc  (Either LRVal Const) WS (Either WS [WSCap (Either Expr LVal)])
-  deriving (Eq, Show, Typeable, Data)
+  deriving (Data, Eq, Generic, Show, Typeable)
 
 data Memb =
   MembStr  String |
   MembVar  Var    |
   MembExpr (WSCap Expr)
-  deriving (Eq, Show, Typeable, Data)
+  deriving (Data, Eq, Generic, Show, Typeable)
 
 -- Expr's
 
@@ -103,37 +107,37 @@ data Expr =
   ExprTernaryIf TernaryIf |
   -- FIXME: this fb extension should be separated to a superclass-like Lang?
   ExprXml       Xml
-  deriving (Eq, Show, Typeable, Data)
+  deriving (Data, Eq, Generic, Show, Typeable)
 
 data Xml = Xml String
   (IC.Intercal WS (String, Maybe (WS2, Either StrLit (WSCap Expr))))
   (Maybe ([Either XmlLitOrExpr Xml], Bool))
-  deriving (Eq, Show, Typeable, Data)
+  deriving (Data, Eq, Generic, Show, Typeable)
 
 data XmlLitOrExpr = XmlLit String | XmlExpr (WSCap Expr)
-  deriving (Eq, Show, Typeable, Data)
+  deriving (Data, Eq, Generic, Show, Typeable)
 
 data BinOp = BAnd | BAndWd | BEQ | BGE | BGT | BID | BLE | BLT | BNE |
   -- <> has different precedence than !=
   BNEOld | BNI | BOr | BOrWd | BXorWd | BByable BinOpBy
-  deriving (Eq, Show, Typeable, Data)
+  deriving (Data, Eq, Generic, Show, Typeable)
 
 data BinOpBy = BBitAnd | BBitOr | BConcat | BDiv | BMinus | BMod | BMul |
   BPlus | BShiftL | BShiftR | BXor
-  deriving (Eq, Show, Typeable, Data)
+  deriving (Data, Eq, Generic, Show, Typeable)
 
 data PreOp = PrPrint | PrAt | PrBitNot | PrClone | PrNegate | PrNot | PrPos |
   PrSuppress | PrIncr | PrDecr
-  deriving (Eq, Show, Typeable, Data)
+  deriving (Data, Eq, Generic, Show, Typeable)
 
 data PostOp = PoIncr | PoDecr
-  deriving (Eq, Show, Typeable, Data)
+  deriving (Data, Eq, Generic, Show, Typeable)
 
 data IncOrReq = Inc | Req
-  deriving (Eq, Show, Typeable, Data)
+  deriving (Data, Eq, Generic, Show, Typeable)
 
 data OnceOrNot = Once | NotOnce
-  deriving (Eq, Show, Typeable, Data)
+  deriving (Data, Eq, Generic, Show, Typeable)
 
 data TernaryIf = TernaryIf {
   ternaryIfCond :: Expr,
@@ -141,10 +145,32 @@ data TernaryIf = TernaryIf {
   ternaryIfThen :: Expr,
   ternaryIfWS2  :: WS2,
   ternaryIfElse :: Expr}
-  deriving (Eq, Show, Typeable, Data)
+  deriving (Data, Eq, Generic, Show, Typeable)
 
 data DubArrowMb = DubArrowMb (Maybe (Expr, WS2)) Expr
-  deriving (Eq, Show, Typeable, Data)
+  deriving (Data, Eq, Generic, Show, Typeable)
+
+instance Out BinOp
+instance Out BinOpBy
+instance Out Const
+instance Out DubArrowMb
+instance Out DynConst
+instance Out Expr
+instance Out IncOrReq
+instance Out LOnlyVal
+instance Out LRVal
+instance Out LVal
+instance Out Memb
+instance Out OnceOrNot
+instance Out PostOp
+instance Out PreOp
+instance Out ROnlyVal
+instance Out RVal
+instance Out TernaryIf
+instance Out Val
+instance Out Var
+instance Out Xml
+instance Out XmlLitOrExpr
 
 $(derive makeBinary ''BinOp)
 $(derive makeBinary ''BinOpBy)

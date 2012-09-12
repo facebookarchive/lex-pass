@@ -1,8 +1,8 @@
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveGeneric #-}
 
 module Data.Intercal where
 
-import Common
 import Control.Arrow
 import Control.Applicative
 import Control.Monad
@@ -11,8 +11,11 @@ import Data.Data
 import Prelude hiding (concatMap, map)
 import qualified Prelude
 
+import Common
+import Text.PrettyPrint.GenericPretty
+
 data Intercal a b = Intercal a b (Intercal a b) | Interend a
-  deriving (Eq, Show, Typeable, Data)
+  deriving (Data, Eq, Generic, Show, Typeable)
 
 -- we're using method that should be faster-but-bigger instead of storing
 -- length.  this is probably the same as the derive one, just use that?
@@ -105,3 +108,4 @@ append :: a -> b -> Intercal b a -> Intercal b a
 append a b (Interend b0) = Intercal b0 a $ Interend b
 append a b (Intercal b0 a0 rest) = Intercal b0 a0 $ append a b rest
 
+instance (Out a, Out b) => Out (Intercal a b)

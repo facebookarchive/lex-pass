@@ -1,6 +1,9 @@
-{-# LANGUAGE DeriveDataTypeable, TemplateHaskell #-}
-
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE TemplateHaskell #-}
 module Lang.Php.Ast.StmtTypes where
+
+import Text.PrettyPrint.GenericPretty
 
 import Lang.Php.Ast.Common
 import Lang.Php.Ast.ExprTypes
@@ -36,18 +39,18 @@ data Stmt =
   StmtUnset     (WSCap [WSCap LRVal]) StmtEnd   |
   StmtUse       (WSCap Use) StmtEnd     |
   StmtWhile     While
-  deriving (Eq, Show, Typeable, Data)
+  deriving (Data, Eq, Generic, Show, Typeable)
 
 -- a block has {}'s, so one-liner's are not considered blocks
 -- and a (Block Stmt) is not the same as a StmtList tho it has the same ast
 data Block a = Block (IC.Intercal WS a)
-  deriving (Eq, Show, Typeable, Data)
+  deriving (Data, Eq, Generic, Show, Typeable)
 
 data Namespace = Namespace String
-  deriving (Eq, Show, Typeable, Data)
+  deriving (Data, Eq, Generic, Show, Typeable)
 
 data Use = Use String
-  deriving (Eq, Show, Typeable, Data)
+  deriving (Data, Eq, Generic, Show, Typeable)
 
 data Func = Func {
   funcWS    :: WS,
@@ -55,18 +58,18 @@ data Func = Func {
   funcName  :: String,
   funcArgs  :: WSCap (Either WS [WSCap FuncArg]),
   funcBlock :: Block Stmt}
-  deriving (Eq, Show, Typeable, Data)
+  deriving (Data, Eq, Generic, Show, Typeable)
 
 data Interface = Interface {
   ifaceName    :: WSCap Const,
   ifaceExtends :: [WSCap Const],
   ifaceBlock   :: Block IfaceStmt}
-  deriving (Eq, Show, Typeable, Data)
+  deriving (Data, Eq, Generic, Show, Typeable)
 
 data IfaceStmt =
   IfaceConst [WSCap (VarEqVal Const)] |
   IfaceFunc AbstrFunc
-  deriving (Eq, Show, Typeable, Data)
+  deriving (Data, Eq, Generic, Show, Typeable)
 
 data AbstrFunc = AbstrFunc {
   abstrFuncPre  :: [(String, WS)],
@@ -75,7 +78,7 @@ data AbstrFunc = AbstrFunc {
   abstrFuncArgs :: Either WS [WSCap FuncArg],
   abstrFuncWS   :: WS,
   abstrFuncStmtEnd :: StmtEnd}
-  deriving (Eq, Show, Typeable, Data)
+  deriving (Data, Eq, Generic, Show, Typeable)
 
 data Class = Class {
   classPre     :: [(String, WS)],
@@ -83,19 +86,19 @@ data Class = Class {
   classExtends :: Maybe (WSCap Const),
   classImplements :: [WSCap Const],
   classBlock   :: Block ClassStmt}
-  deriving (Eq, Show, Typeable, Data)
+  deriving (Data, Eq, Generic, Show, Typeable)
 
 data FuncArg = FuncArg {
   funcArgType :: Maybe (Maybe Const, WS),
   funcArgRef  :: Maybe WS,
   funcArgVar  :: VarMbVal}
-  deriving (Eq, Show, Typeable, Data)
+  deriving (Data, Eq, Generic, Show, Typeable)
 
 data VarMbVal = VarMbVal Var (Maybe (WS2, Expr))
-  deriving (Eq, Show, Typeable, Data)
+  deriving (Data, Eq, Generic, Show, Typeable)
 
 data VarEqVal a = VarEqVal a WS2 Expr
-  deriving (Eq, Show, Typeable, Data)
+  deriving (Data, Eq, Generic, Show, Typeable)
 
 data ClassStmt =
   -- this list must have at least one element.. should i make a type for that?
@@ -106,73 +109,100 @@ data ClassStmt =
   CStmtCategory String |
   CStmtChildren String |
   CStmtAttribute String
-  deriving (Eq, Show, Typeable, Data)
+  deriving (Data, Eq, Generic, Show, Typeable)
 
 data DoWhile = DoWhile {
   doWhileBlock   :: WSCap BlockOrStmt,
   doWhileExpr    :: WSCap2 Expr,
   doWhileStmtEnd :: StmtEnd}
-  deriving (Eq, Show, Typeable, Data)
+  deriving (Data, Eq, Generic, Show, Typeable)
 
 data Declare = Declare {
   declareHeader  :: WSCap (WSCap Const, WSCap Expr),
   declareStmtEnd :: StmtEnd}
-  deriving (Eq, Show, Typeable, Data)
+  deriving (Data, Eq, Generic, Show, Typeable)
 
 data For = For {
   forHeader :: WSCap (ForPart, ForPart, ForPart),
   forBlock  :: BlockOrStmt}
-  deriving (Eq, Show, Typeable, Data)
+  deriving (Data, Eq, Generic, Show, Typeable)
 
 data ForPart = ForPart (Either WS [WSCap Expr])
-  deriving (Eq, Show, Typeable, Data)
+  deriving (Data, Eq, Generic, Show, Typeable)
 
 data Foreach = Foreach {
   foreachHeader :: WSCap (WSCap Expr, WSCap DubArrowMb),
   foreachBlock  :: BlockOrStmt}
-  deriving (Eq, Show, Typeable, Data)
+  deriving (Data, Eq, Generic, Show, Typeable)
 
 data If = If {
   -- And when ifAltColonSyntax is True, all the BlockOrStmts must be Blocks.
   ifAltColonSyntax :: Bool,
   ifAndIfelses :: IC.Intercal IfBlock (WS, Maybe WS),
   ifElse       :: Maybe (WS2, BlockOrStmt)}
-  deriving (Eq, Show, Typeable, Data)
+  deriving (Data, Eq, Generic, Show, Typeable)
 
 data IfBlock = IfBlock {
   ifBlockExpr  :: WSCap2 Expr,
   ifBlockBlock :: BlockOrStmt}
-  deriving (Eq, Show, Typeable, Data)
+  deriving (Data, Eq, Generic, Show, Typeable)
 
 data Switch = Switch {
   switchExpr  :: WSCap2 Expr,
   switchWS    :: WS,
   switchCases :: [Case]}
-  deriving (Eq, Show, Typeable, Data)
+  deriving (Data, Eq, Generic, Show, Typeable)
 
 data Case = Case {
   caseExpr     :: Either WS (WSCap Expr),
   caseStmtList :: StmtList}
-  deriving (Eq, Show, Typeable, Data)
+  deriving (Data, Eq, Generic, Show, Typeable)
 
 data Catch = Catch {
   catchHeader :: WSCap (WSCap Const, Expr),
   catchWS     :: WS,
   catchBlock  :: Block Stmt}
-  deriving (Eq, Show, Typeable, Data)
+  deriving (Data, Eq, Generic, Show, Typeable)
 
 data While = While {
   whileExpr  :: WSCap2 Expr,
   whileBlock :: BlockOrStmt}
-  deriving (Eq, Show, Typeable, Data)
+  deriving (Data, Eq, Generic, Show, Typeable)
 
 data TopLevel = TopLevel String (Maybe (Either (WSCap Expr, StmtEnd) String))
-  deriving (Eq, Show, Typeable, Data)
+  deriving (Data, Eq, Generic, Show, Typeable)
 
 data StmtEnd = StmtEndSemi | StmtEndClose TopLevel
-  deriving (Eq, Show, Typeable, Data)
+  deriving (Data, Eq, Generic, Show, Typeable)
 
 type BlockOrStmt = Either Stmt (Block Stmt)
+
+instance Out AbstrFunc
+instance (Out a) => Out (Block a)
+instance Out Case
+instance Out Catch
+instance Out Class
+instance Out ClassStmt
+instance Out Declare
+instance Out DoWhile
+instance Out For
+instance Out ForPart
+instance Out Foreach
+instance Out Func
+instance Out FuncArg
+instance Out If
+instance Out IfaceStmt
+instance Out IfBlock
+instance Out Interface
+instance Out Namespace
+instance Out Stmt
+instance Out StmtEnd
+instance Out Switch
+instance Out TopLevel
+instance Out Use
+instance Out VarMbVal
+instance (Out a) => Out (VarEqVal a)
+instance Out While
 
 $(derive makeBinary ''AbstrFunc)
 $(derive makeBinary ''Block)
