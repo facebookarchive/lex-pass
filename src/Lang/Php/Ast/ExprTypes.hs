@@ -142,7 +142,7 @@ data OnceOrNot = Once | NotOnce
 data TernaryIf = TernaryIf {
   ternaryIfCond :: Expr,
   ternaryIfWS1  :: WS2,
-  ternaryIfThen :: Expr,
+  ternaryIfThen :: Maybe Expr,
   ternaryIfWS2  :: WS2,
   ternaryIfElse :: Expr}
   deriving (Data, Eq, Generic, Show, Typeable)

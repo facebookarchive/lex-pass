@@ -1,4 +1,5 @@
-{-# LANGUAGE FlexibleInstances, TypeSynonymInstances #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE TypeSynonymInstances #-}
 
 module Common (
   module Text.ParserCombinators.Parsec,
@@ -9,8 +10,7 @@ import Control.Monad
 import Text.ParserCombinators.Parsec hiding (State, parse, choice)
 import Text.ParserCombinators.Parsec.Expr
 
--- parsec 2 vs 3 stuff
-
+-- | Used w/ buildExpressionParser.
 type Oper a = Operator Char () a
 
 class Parse a where
@@ -22,12 +22,11 @@ class Unparse a where
 instance (Parse a) => Parse [a] where
   parse = many parse
 
+instance (Parse a) => Parse (Maybe a) where
+  parse = Just <$> parse <|> return Nothing
+
 instance (Parse a, Parse b) => Parse (Either a b) where
   parse = Left <$> parse <|> Right <$> parse
-
-instance (Unparse a, Unparse b) => Unparse (Either a b) where
-  unparse (Left a) = unparse a
-  unparse (Right a) = unparse a
 
 instance (Unparse a, Unparse b) => Unparse (a, b) where
   unparse (a, b) = unparse a ++ unparse b
@@ -38,3 +37,6 @@ instance (Unparse a) => Unparse [a] where
 instance (Unparse a) => Unparse (Maybe a) where
   unparse = maybe "" unparse
 
+instance (Unparse a, Unparse b) => Unparse (Either a b) where
+  unparse (Left a) = unparse a
+  unparse (Right a) = unparse a

@@ -489,7 +489,7 @@ preRep, postRep :: Parser (a -> a) -> Parser (a -> a)
 preRep p = (p >>= \ f -> (f .) <$> preRep p) <|> return id
 postRep p = (p >>= \ f -> (. f) <$> postRep p) <|> return id
 
-ial :: [Parser (a -> a -> a)] -> [Oper a]
+ial, ian :: [Parser (a -> a -> a)] -> [Oper a]
 ial = map $ flip Infix AssocLeft
 ian = map $ flip Infix AssocNone
 
@@ -557,7 +557,7 @@ eptOr     = binOp BOr     tokOrP
 eptTernaryIf :: Parser ((Expr, WS) -> (Expr, WS))
 eptTernaryIf = do
   w2 <- tokQMarkP >> parse
-  (e2, w3) <- parse
+  (e2, w3) <- maybe (Nothing, []) (first Just) <$> parse
   w4 <- tokColonP >> parse
   (e3, w5) <- parse
   return $ \ (e1, w1) ->
