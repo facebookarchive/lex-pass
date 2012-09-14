@@ -28,6 +28,7 @@ executable lex-pass
                   filepath,
                   FUtil,
                   GenericPretty,
+                  HSH            >= 2 && < 3,
                   MissingH,
                   mtl,
                   parsec         >= 3 && < 4,
