@@ -139,4 +139,3 @@ instance (Out a) => Out (WSCap a)
 
 $(derive makeBinary ''WSElem)
 $(derive makeBinary ''WSCap)
-

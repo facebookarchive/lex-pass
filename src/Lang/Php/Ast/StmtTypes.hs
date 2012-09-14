@@ -6,10 +6,10 @@ module Lang.Php.Ast.StmtTypes where
 
 import Text.PrettyPrint.GenericPretty
 
+import qualified Data.Intercal as IC
 import Lang.Php.Ast.ArgList
 import Lang.Php.Ast.Common
 import Lang.Php.Ast.Lex
-import qualified Data.Intercal as IC
 
 -- Val's are defined to only contain: "$", identifiers, "[Expr]", "[]",
 -- "(Exprs)", "${Expr}", "::", "->".  The most important consideration is which

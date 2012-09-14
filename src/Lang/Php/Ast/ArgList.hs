@@ -1,11 +1,10 @@
-{-# LANGUAGE DeriveDataTypeable, TemplateHaskell #-}
-
 module Lang.Php.Ast.ArgList where
 
 import Data.Either.Utils
+
+import qualified Data.Intercal as IC
 import Lang.Php.Ast.Common
 import Lang.Php.Ast.Lex
-import qualified Data.Intercal as IC
 
 type ArgList a = Either WS [WSCap a]
 
@@ -74,4 +73,3 @@ grabArgs emptyElemsAllowed finalCommaAllowed isFirstArgAndWSPoss
       grabArgs emptyElemsAllowed finalCommaAllowed False overOneArgAllowed p
   (arg:) <$> (if canContinue then ((tokCommaP >> cont) <|>) else id)
     (tokRParenP >> return [])
-

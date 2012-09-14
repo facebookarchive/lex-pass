@@ -5,12 +5,13 @@
 module Lang.Php.Ast.StmtParse where
 
 import Control.Monad.Identity
+import Text.ParserCombinators.Parsec.Expr
+
+import qualified Data.Intercal as IC
 import Lang.Php.Ast.ArgList
 import Lang.Php.Ast.Common
 import Lang.Php.Ast.Lex
 import Lang.Php.Ast.StmtTypes
-import Text.ParserCombinators.Parsec.Expr
-import qualified Data.Intercal as IC
 
 -- Val
 

@@ -4,10 +4,10 @@
 
 module Lang.Php.Ast.Lex where
 
+import qualified Data.Set as Set
 import Text.PrettyPrint.GenericPretty
 
 import Lang.Php.Ast.Common
-import qualified Data.Set as Set
 
 data StrLit = StrLit String
   deriving (Data, Eq, Generic, Show, Typeable)
@@ -448,4 +448,3 @@ instance Out StrLit
 $(derive makeBinary ''HereDoc)
 $(derive makeBinary ''NumLit)
 $(derive makeBinary ''StrLit)
-
