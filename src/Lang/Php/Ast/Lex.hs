@@ -64,6 +64,9 @@ instance Unparse NumLit where
 data HereDoc = HereDoc String
   deriving (Data, Eq, Generic, Show, Typeable)
 
+wsNoNLParser :: Parser String
+wsNoNLParser = many (satisfy (\ x -> isSpace x && x /= '\n'))
+
 instance Parse HereDoc where
   parse = HereDoc <$> do
     ws <- tokHereDocP >> wsNoNLParser

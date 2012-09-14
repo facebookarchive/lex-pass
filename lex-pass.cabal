@@ -19,19 +19,18 @@ executable lex-pass
     buildable: False
   hs-source-dirs: src
   main-is:        Main.hs
-  build-depends:  FUtil,
-                  GenericPretty,
-                  HSH >= 2,
-                  MissingH,
-                  base >= 4,
+  build-depends:  base           >= 4 && < 5,
                   binary,
                   bytestring,
                   containers,
                   derive,
                   directory,
                   filepath,
+                  FUtil,
+                  GenericPretty,
+                  MissingH,
                   mtl,
-                  parsec == 3.*,
+                  parsec         >= 3 && < 4,
                   process,
                   syb
   ghc-options:    -threaded
@@ -41,18 +40,18 @@ executable lex-pass-test
     buildable: False
   hs-source-dirs: src
   main-is:        Lang/Php/Ast/Test.hs
-  build-depends:  FUtil,
-                  GenericPretty,
-                  HSH >= 2,
-                  base >= 4,
+  build-depends:  base >= 4,
                   binary,
                   bytestring,
                   containers,
                   derive,
                   directory,
                   filepath,
+                  FUtil,
+                  GenericPretty,
+                  HSH            >= 2 && < 3,
                   mtl,
-                  parsec == 3.*,
+                  parsec         >= 3 && < 4,
                   process,
                   syb
   ghc-options:    -threaded

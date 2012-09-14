@@ -12,6 +12,8 @@ import Prelude hiding (concatMap, map)
 import qualified Prelude
 
 import Common
+import Parse
+import Unparse
 import Text.PrettyPrint.GenericPretty
 
 data Intercal a b = Intercal a b (Intercal a b) | Interend a

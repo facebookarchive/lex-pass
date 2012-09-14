@@ -8,6 +8,7 @@ import Lang.Php.Ast.ArgList
 import Lang.Php.Ast.Common
 import Lang.Php.Ast.Lex
 import Lang.Php.Ast.StmtTypes
+import Lang.Php.Ast.WS
 
 -- Val
 
@@ -102,8 +103,7 @@ instance Unparse Expr where
     ExprIndex a w b ->
       unparse a ++ unparse w ++ tokLBracket ++ unparse b ++ tokRBracket
     ExprInstOf e w t -> unparse e ++ w2With tokInstanceof w ++ unparse t
-    ExprIsset w vs -> tokIsset ++ unparse w ++ tokLParen ++
-      intercalate tokComma (map unparse vs) ++ tokRParen
+    ExprIsset w vs -> tokIsset ++ unparse w ++ reqArgListUnparser vs
     ExprNew w a argsMb -> tokNew ++ unparse w ++ unparse a ++ maybe ""
       (\ (wPre, args) -> unparse wPre ++ tokLParen ++ either unparse
         (intercalate tokComma . map unparse) args ++ tokRParen) argsMb
@@ -210,7 +210,8 @@ instance Unparse FuncArg where
     maybe [] ((tokAmp ++) . unparse) refWs, unparse var]
 
 instance Unparse AnonFuncUse where
-  unparse (AnonFuncUse argList) = tokUse ++ unparse argList
+  unparse (AnonFuncUse argList) =
+    tokUse ++ wsCapUnparser reqArgListUnparser argList
 
 instance Unparse AnonFunc where
   unparse (AnonFunc w1 ref (WSCap w2 args w3) use block) = concat [tokFunction,
@@ -247,9 +248,8 @@ instance Unparse Stmt where
     StmtSwitch a -> unparse a
     StmtThrow a end -> tokThrow ++ unparse a ++ unparse end
     StmtTry a cs -> tokTry ++ unparse a ++ unparse cs
-    StmtUnset (WSCap w1 a w2) end -> tokUnset ++ unparse w1 ++ tokLParen ++
-      intercalate tokComma (map unparse a) ++ tokRParen ++ unparse w2 ++
-      unparse end
+    StmtUnset a end ->
+      tokUnset ++ wsCapUnparser reqArgListUnparser a ++ unparse end
     StmtUse n end -> tokUse ++ unparse n ++ unparse end
     StmtWhile a -> unparse a
 
@@ -264,7 +264,7 @@ instance Unparse TopLevel where
 instance (Unparse a) => Unparse (Block a) where
   unparse (Block a) = tokLBrace ++ unparse a ++ tokRBrace
 
-unparsePre :: [(String, WS)] -> String
+unparsePre :: Unparser [(String, WS)]
 unparsePre = concatMap (\ (a, b) -> a ++ unparse b)
 
 instance Unparse Class where
@@ -286,7 +286,7 @@ instance Unparse ClassStmt where
     CStmtChildren a -> tokChildren ++ a ++ tokSemi
     CStmtAttribute a -> tokAttribute ++ a ++ tokSemi
 
-cStmtConstUnparser :: (Unparse a) => [a] -> String
+cStmtConstUnparser :: (Unparse a) => Unparser [a]
 cStmtConstUnparser vars = tokConst ++
   intercalate tokComma (map unparse vars) ++ tokSemi
 
@@ -330,7 +330,7 @@ instance Unparse Func where
     unparse w1, maybe [] ((tokAmp ++) . unparse) ref, name, unparse w2,
     tokLParen, argsUnparser args, tokRParen, unparse w3, unparse block]
 
-argsUnparser :: (Unparse t, Unparse s) => Either t [s] -> String
+argsUnparser :: (Unparse t, Unparse s) => Unparser (Either t [s])
 argsUnparser = either unparse (intercalate tokComma . map unparse)
 
 instance Unparse If where
@@ -348,7 +348,7 @@ instance Unparse If where
       unparse ws ++ doElsery elsery ++ unparseIfBlock isColon ifBlock
     mbColon = if isColon then tokColon else ""
 
-colonUnparseBlockOrStmt :: Bool -> BlockOrStmt -> String
+colonUnparseBlockOrStmt :: Bool -> Unparser BlockOrStmt
 colonUnparseBlockOrStmt isColon (Right (Block body)) = if isColon
   then tokColon ++ unparse body
   else unparse (Block body)
@@ -358,7 +358,7 @@ colonUnparseBlockOrStmt isColon (Left stmt) = if isColon
   then error "Colon notation should only use blocks."
   else unparse stmt
 
-unparseIfBlock :: Bool -> IfBlock -> String
+unparseIfBlock :: Bool -> Unparser IfBlock
 unparseIfBlock isColon (IfBlock (WSCap w1 expr w2) blockOrStmt) =
   concat [unparse w1, tokLParen, unparse expr, tokRParen, unparse w2] ++
   colonUnparseBlockOrStmt isColon blockOrStmt

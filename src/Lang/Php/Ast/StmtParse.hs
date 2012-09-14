@@ -5,12 +5,14 @@
 module Lang.Php.Ast.StmtParse where
 
 import Control.Monad.Identity
+import FUtil
 import Text.ParserCombinators.Parsec.Expr
 
 import qualified Data.Intercal as IC
 import Lang.Php.Ast.ArgList
 import Lang.Php.Ast.Common
 import Lang.Php.Ast.Lex
+import Lang.Php.Ast.LexWS
 import Lang.Php.Ast.StmtTypes
 
 -- Val
@@ -280,6 +282,9 @@ funclike1Parser :: (Parse (a, WS)) => (WS -> WSCap a -> b) -> Parser c ->
   Parser b
 funclike1Parser constr tokP = liftM2 constr (tokP >> parse)
   (tokLParenP >> parse <* tokRParenP)
+
+-- | Used w/ buildExpressionParser.
+type Oper a = Operator Char () a
 
 exprParserTable :: [[Oper (Expr, WS)]]
 exprParserTable = [

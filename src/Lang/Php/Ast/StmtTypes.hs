@@ -7,6 +7,7 @@ module Lang.Php.Ast.StmtTypes where
 import Text.PrettyPrint.GenericPretty
 
 import qualified Data.Intercal as IC
+import qualified Data.List.NonEmpty as NE
 import Lang.Php.Ast.ArgList
 import Lang.Php.Ast.Common
 import Lang.Php.Ast.Lex
@@ -98,7 +99,7 @@ data Expr =
   ExprInclude   IncOrReq OnceOrNot WS Expr |
   -- true story: "instanceof" takes LRVal's but not non-Const ROnlyVal's..
   ExprInstOf    Expr WS2 (Either LRVal Const) |
-  ExprIsset     WS [WSCap LRVal] |
+  ExprIsset     WS (NE.NonEmpty (WSCap LRVal)) |
   ExprNew       WS RVal (Maybe (WS, Either WS [WSCap Expr])) |
   ExprNumLit    NumLit |
   ExprParen     (WSCap Expr) |
@@ -156,8 +157,7 @@ data DubArrowMb = DubArrowMb (Maybe (Expr, WS2)) Expr
   deriving (Data, Eq, Generic, Show, Typeable)
 
 data AnonFuncUse = AnonFuncUse {
-  -- Note that this list must be nonempty.
-  afuncUseArgs :: WSCap [WSCap FuncArg]}
+  afuncUseArgs :: WSCap (NE.NonEmpty (WSCap FuncArg))}
   deriving (Data, Eq, Generic, Show, Typeable)
 
 data AnonFunc = AnonFunc {
@@ -205,7 +205,7 @@ data Stmt =
   StmtSwitch    Switch |
   StmtThrow     (WSCap Expr) StmtEnd          |
   StmtTry       (WSCap (Block Stmt)) (IC.Intercal Catch WS) |
-  StmtUnset     (WSCap [WSCap LRVal]) StmtEnd   |
+  StmtUnset     (WSCap (NE.NonEmpty (WSCap LRVal))) StmtEnd   |
   StmtUse       (WSCap Use) StmtEnd     |
   StmtWhile     While
   deriving (Data, Eq, Generic, Show, Typeable)
