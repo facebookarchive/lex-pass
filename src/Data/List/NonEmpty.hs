@@ -1,6 +1,5 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE TemplateHaskell #-}
 
 module Data.List.NonEmpty where
 
@@ -27,5 +26,3 @@ length :: NonEmpty a -> Int
 length = L.length . toList
 
 instance (Out a) => Out (NonEmpty a)
-
-$(derive makeBinary ''NonEmpty)

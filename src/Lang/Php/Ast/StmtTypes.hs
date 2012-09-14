@@ -1,6 +1,5 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE TemplateHaskell #-}
 
 module Lang.Php.Ast.StmtTypes where
 
@@ -389,53 +388,3 @@ instance Out VarMbVal
 instance Out While
 instance Out Xml
 instance Out XmlLitOrExpr
-
-$(derive makeBinary ''AbstrFunc)
-$(derive makeBinary ''AnonFunc)
-$(derive makeBinary ''AnonFuncUse)
-$(derive makeBinary ''BinOp)
-$(derive makeBinary ''BinOpBy)
-$(derive makeBinary ''Block)
-$(derive makeBinary ''Case)
-$(derive makeBinary ''Catch)
-$(derive makeBinary ''Class)
-$(derive makeBinary ''ClassStmt)
-$(derive makeBinary ''Const)
-$(derive makeBinary ''Declare)
-$(derive makeBinary ''DoWhile)
-$(derive makeBinary ''DubArrowMb)
-$(derive makeBinary ''DynConst)
-$(derive makeBinary ''Expr)
-$(derive makeBinary ''For)
-$(derive makeBinary ''Foreach)
-$(derive makeBinary ''ForPart)
-$(derive makeBinary ''Func)
-$(derive makeBinary ''FuncArg)
-$(derive makeBinary ''If)
-$(derive makeBinary ''IfaceStmt)
-$(derive makeBinary ''IfBlock)
-$(derive makeBinary ''IncOrReq)
-$(derive makeBinary ''Interface)
-$(derive makeBinary ''LOnlyVal)
-$(derive makeBinary ''LRVal)
-$(derive makeBinary ''LVal)
-$(derive makeBinary ''Memb)
-$(derive makeBinary ''Namespace)
-$(derive makeBinary ''OnceOrNot)
-$(derive makeBinary ''PostOp)
-$(derive makeBinary ''PreOp)
-$(derive makeBinary ''ROnlyVal)
-$(derive makeBinary ''RVal)
-$(derive makeBinary ''Stmt)
-$(derive makeBinary ''StmtEnd)
-$(derive makeBinary ''Switch)
-$(derive makeBinary ''TernaryIf)
-$(derive makeBinary ''TopLevel)
-$(derive makeBinary ''Use)
-$(derive makeBinary ''Val)
-$(derive makeBinary ''Var)
-$(derive makeBinary ''VarEqVal)
-$(derive makeBinary ''VarMbVal)
-$(derive makeBinary ''While)
-$(derive makeBinary ''Xml)
-$(derive makeBinary ''XmlLitOrExpr)

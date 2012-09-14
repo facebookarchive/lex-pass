@@ -19,18 +19,6 @@ import Text.PrettyPrint.GenericPretty
 data Intercal a b = Intercal a b (Intercal a b) | Interend a
   deriving (Data, Eq, Generic, Show, Typeable)
 
--- we're using method that should be faster-but-bigger instead of storing
--- length.  this is probably the same as the derive one, just use that?
-instance (Binary a, Binary b) => Binary (Intercal a b) where
-  put (Intercal x y r) = put (0 :: Word8) >> put x >> put y >> put r
-  put (Interend x)     = put (1 :: Word8) >> put x
-  get = do
-    tag <- getWord8
-    case tag of
-      0 -> liftM3 Intercal get get get
-      1 -> liftM  Interend get
-      _ -> fail "corrupt"
-
 intercalParser :: Parser a -> Parser b -> Parser (Intercal a b)
 intercalParser a b = do
   aRes <- a

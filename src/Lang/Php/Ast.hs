@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveDataTypeable, TemplateHaskell #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 
 module Lang.Php.Ast (
   module Lang.Php.Ast.Common,
@@ -7,16 +7,18 @@ module Lang.Php.Ast (
   Ast
   ) where
 
-import Common
 import Control.Applicative hiding ((<|>), many)
 import Control.Arrow
 import Control.Monad
+import Data.Binary.Generic
 import Data.Char
+
+import Common
+import qualified Data.ByteString as BS
+import qualified Data.Intercal as IC
 import Lang.Php.Ast.Common
 import Lang.Php.Ast.Lex
 import Lang.Php.Ast.Stmt
-import qualified Data.ByteString as BS
-import qualified Data.Intercal as IC
 
 data Ast = Ast TopLevel StmtList
   deriving (Eq, Show, Typeable, Data)
@@ -26,6 +28,3 @@ instance Unparse Ast where
 
 instance Parse Ast where
   parse = liftM2 Ast parse stmtListP
-
-$(derive makeBinary ''Ast)
-

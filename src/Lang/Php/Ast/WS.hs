@@ -4,7 +4,6 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverlappingInstances #-}
 {-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
 
@@ -46,8 +45,6 @@ instance Unparse WSElem where
     (if isSlash then tokLineComment else tokPound) ++ a
 
 instance Out WSElem
-
-$(derive makeBinary ''WSElem)
 
 -- WS
 
@@ -92,8 +89,6 @@ instance (Parse (a, WS)) => Parse (WSCap a) where
   parse = wsToWsCapParser parse
 
 instance (Out a) => Out (WSCap a)
-
-$(derive makeBinary ''WSCap)
 
 wsCapParser :: Parser a -> Parser (WSCap a)
 wsCapParser = wsToWsCapParser . toWsParser

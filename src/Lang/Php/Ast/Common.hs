@@ -1,3 +1,6 @@
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE UndecidableInstances #-}
+
 module Lang.Php.Ast.Common
     (
       module Data.Binary
@@ -14,6 +17,7 @@ module Lang.Php.Ast.Common
     ) where
 
 import Data.Binary
+import Data.Binary.Generic
 import Data.Char
 import Data.Data hiding (Infix, Prefix)
 import Data.DeriveTH
@@ -24,3 +28,7 @@ import Common
 import Parse
 import Unparse
 import Lang.Php.Ast.WS
+
+instance (Data a) => Binary a where
+  get = getGeneric
+  put = putGeneric

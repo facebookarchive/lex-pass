@@ -21,6 +21,7 @@ executable lex-pass
   main-is:        Main.hs
   build-depends:  base           >= 4 && < 5,
                   binary,
+                  binary-generic,
                   bytestring,
                   containers,
                   derive,
@@ -41,8 +42,9 @@ executable lex-pass-test
     buildable: False
   hs-source-dirs: src
   main-is:        Lang/Php/Ast/Test.hs
-  build-depends:  base >= 4,
+  build-depends:  base           >= 4,
                   binary,
+                  binary-generic,
                   bytestring,
                   containers,
                   derive,

@@ -1,6 +1,5 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE TemplateHaskell #-}
 
 module Lang.Php.Ast.Lex where
 
@@ -447,7 +446,3 @@ tokAttributeP = identCI tokAttribute
 instance Out HereDoc
 instance Out NumLit
 instance Out StrLit
-
-$(derive makeBinary ''HereDoc)
-$(derive makeBinary ''NumLit)
-$(derive makeBinary ''StrLit)
