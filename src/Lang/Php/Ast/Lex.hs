@@ -122,10 +122,10 @@ stringCI = mapM charCI
 
 -- idk why but we need an explicit specialized type instead of using (string)
 -- directly
-s :: String -> Parser String
-s = string
+str :: String -> Parser String
+str = string
 
-nc t cs = try $ s t <* notFollowedBy (oneOf cs)
+nc t cs = try $ str t <* notFollowedBy (oneOf cs)
 
 -- ugly, redo this.. maybe have a minimal lexer stage after all?
 tokNot = "!"
@@ -133,71 +133,71 @@ tokNotP = nc tokNot "="
 tokNE = "!="
 tokNEP = nc tokNE "="
 tokNI = "!=="
-tokNIP = try $ s tokNI
+tokNIP = try $ str tokNI
 tokDollar = "$"
-tokDollarP = s tokDollar
+tokDollarP = str tokDollar
 tokMod = "%"
 tokModP = nc tokMod "="
 tokModBy = "%="
-tokModByP = try $ s tokModBy
+tokModByP = try $ str tokModBy
 tokAmp = "&"
 tokAmpP = nc tokAmp "&="
 tokAnd = "&&"
-tokAndP = try $ s tokAnd
+tokAndP = try $ str tokAnd
 tokBitAndBy = "&="
-tokBitAndByP = try $ s tokBitAndBy
+tokBitAndByP = try $ str tokBitAndBy
 tokLParen = "("
-tokLParenP = s tokLParen
+tokLParenP = str tokLParen
 tokRParen = ")"
-tokRParenP = s tokRParen
+tokRParenP = str tokRParen
 tokMul = "*"
 tokMulP = nc tokMul "=/"
 tokMulBy = "*="
-tokMulByP = try $ s tokMulBy
+tokMulByP = try $ str tokMulBy
 tokPlus = "+"
 tokPlusP = nc tokPlus "+="
 tokIncr = "++"
-tokIncrP = try $ s tokIncr
+tokIncrP = try $ str tokIncr
 tokPlusBy = "+="
-tokPlusByP = try $ s tokPlusBy
+tokPlusByP = try $ str tokPlusBy
 tokComma = ","
-tokCommaP = s tokComma
+tokCommaP = str tokComma
 tokMinus = "-"
 tokMinusP = nc tokMinus "-=>"
 tokDecr = "--"
-tokDecrP = try $ s tokDecr
+tokDecrP = try $ str tokDecr
 tokMinusBy = "-="
-tokMinusByP = try $ s tokMinusBy
+tokMinusByP = try $ str tokMinusBy
 tokArrow = "->"
-tokArrowP = try $ s tokArrow
+tokArrowP = try $ str tokArrow
 tokConcat = "."
 tokConcatP = nc tokConcat "="
 tokConcatBy = ".="
-tokConcatByP = try $ s tokConcatBy
+tokConcatByP = try $ str tokConcatBy
 tokDiv = "/"
 tokDivP = nc tokDiv "=*/"
 tokDivBy = "/="
-tokDivByP = try $ s tokDivBy
+tokDivByP = try $ str tokDivBy
 tokColon = ":"
 tokColonP = nc tokColon ":"
 tokDubColon = "::"
-tokDubColonP = try $ s tokDubColon
+tokDubColonP = try $ str tokDubColon
 tokSemi = ";"
-tokSemiP = s tokSemi
+tokSemiP = str tokSemi
 tokLT = "<"
 tokLTP = nc tokLT "<=>"
 tokShiftL = "<<"
 tokShiftLP = nc tokShiftL "<="
 tokHereDoc = "<<<"
-tokHereDocP = try $ s tokHereDoc
+tokHereDocP = try $ str tokHereDoc
 tokShiftLBy = "<<="
-tokShiftLByP = try $ s tokShiftLBy
+tokShiftLByP = try $ str tokShiftLBy
 tokLE = "<="
-tokLEP = try $ s tokLE
+tokLEP = try $ str tokLE
 tokNEOld = "<>"
-tokNEOldP = try $ s tokNEOld
+tokNEOldP = try $ str tokNEOld
 tokOpenPhp = "<?php"
-tokOpenPhpP = try $ s "<?" >> optional (identCI "php")
+tokOpenPhpP = try $ str "<?" >> optional (identCI "php")
 tokOpenPhpEcho = "<?="
 -- no tokOpenPhpEchoP, done manually currently, has weird rules
 tokEquals = "="
@@ -205,43 +205,43 @@ tokEqualsP = nc tokEquals "=>"
 tokEQ = "=="
 tokEQP = nc tokEQ "="
 tokID = "==="
-tokIDP = try $ s tokID
+tokIDP = try $ str tokID
 tokDubArrow = "=>"
-tokDubArrowP = try $ s tokDubArrow
+tokDubArrowP = try $ str tokDubArrow
 tokGT = ">"
 tokGTP = nc tokGT "=>"
 tokGE = ">="
-tokGEP = try $ s tokGE
+tokGEP = try $ str tokGE
 tokShiftR = ">>"
 tokShiftRP = nc tokShiftR "="
 tokShiftRBy = ">>="
-tokShiftRByP = try $ s tokShiftRBy
+tokShiftRByP = try $ str tokShiftRBy
 tokQMark = "?"
 tokQMarkP = nc tokQMark ">"
 tokClosePhp = "?>"
-tokClosePhpP = try $ s tokClosePhp
+tokClosePhpP = try $ str tokClosePhp
 tokAt = "@"
-tokAtP = s tokAt
+tokAtP = str tokAt
 tokLBracket = "["
-tokLBracketP = s tokLBracket
+tokLBracketP = str tokLBracket
 tokRBracket = "]"
-tokRBracketP = s tokRBracket
+tokRBracketP = str tokRBracket
 tokXor = "^"
 tokXorP = nc tokXor "="
 tokXorBy = "^="
-tokXorByP = try $ s tokXorBy
+tokXorByP = try $ str tokXorBy
 tokLBrace = "{"
-tokLBraceP = s tokLBrace
+tokLBraceP = str tokLBrace
 tokBitOr = "|"
 tokBitOrP = nc tokBitOr "=|"
 tokBitOrBy = "|="
-tokBitOrByP = try $ s tokBitOrBy
+tokBitOrByP = try $ str tokBitOrBy
 tokOr = "||"
-tokOrP = try $ s tokOr
+tokOrP = try $ str tokOr
 tokRBrace = "}"
-tokRBraceP = s tokRBrace
+tokRBraceP = str tokRBrace
 tokBitNot = "~"
-tokBitNotP = s tokBitNot
+tokBitNotP = str tokBitNot
 
 tokAbstract = "abstract"
 tokAndWd = "and"

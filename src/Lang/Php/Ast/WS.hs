@@ -10,7 +10,6 @@
 
 module Lang.Php.Ast.WS where
 
-import Data.Char
 import Data.Binary
 import Data.Data
 import Data.DeriveTH

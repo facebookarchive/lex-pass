@@ -2,6 +2,8 @@ module Lang.Php.Ast.LexWS where
 
 import Common
 
+tokStartComment, tokLineComment, tokEndComment, tokPound :: String
+tokStartCommentP, tokLineCommentP, tokEndCommentP, tokPoundP :: Parser String
 tokStartComment = "/*"
 tokStartCommentP = try $ string tokStartComment
 tokLineComment = "//";
@@ -9,14 +11,16 @@ tokLineCommentP = try $ string tokLineComment
 tokEndComment = "*/"
 tokEndCommentP = try $ string tokEndComment
 tokPound = "#"
-tokPoundP :: Parser String
 tokPoundP = string tokPound
 
+upToCharsParser :: Char -> Char -> Parser String
 upToCharsParser c1 c2 = do
   (gotChars, r) <- upToCharsOrEndParser (const True) c1 c2
   if gotChars then return r
     else fail $ "Unexpected <eof>, expecting " ++ [c1, c2] ++ "."
 
+upToCharsOrEndParser :: (Char -> Bool) -> Char -> Char
+                     -> Parser (Bool, String)
 upToCharsOrEndParser f c1 c2 = do
   s <- many (satisfy (\ x -> x /= c1 && f x))
   r1Mb <- optionMaybe (char c1)
@@ -24,6 +28,8 @@ upToCharsOrEndParser f c1 c2 = do
     Nothing -> return (False, "")
     Just _ -> upToCharsOrEndParserC2 f c1 c2
 
+upToCharsOrEndParserC2 :: (Char -> Bool) -> Char -> Char
+                       -> Parser (Bool, String)
 upToCharsOrEndParserC2 f c1 c2 = do
   r2Mb <- optionMaybe $ satisfy f
   case r2Mb of

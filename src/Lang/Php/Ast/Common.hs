@@ -19,7 +19,6 @@ import Data.Data hiding (Infix, Prefix)
 import Data.DeriveTH
 import Data.List
 import Data.Maybe
-import FUtil
 
 import Common
 import Parse

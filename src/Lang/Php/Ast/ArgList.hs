@@ -2,7 +2,6 @@ module Lang.Php.Ast.ArgList where
 
 import Data.Either.Utils
 
-import qualified Data.Intercal as IC
 import qualified Data.List.NonEmpty as NE
 import Lang.Php.Ast.Common
 import Lang.Php.Ast.Lex
@@ -51,8 +50,7 @@ exitListParser = fmap (fmap (fromRight . head)) .
 genArgListParser :: Bool -> Bool -> Bool -> Bool -> Parser (a, WS) ->
   Parser (Either WS [Either WS (WSCap a)])
 genArgListParser emptyElemsAllowed finalCommaAllowed singleWSPoss
-    overOneArgAllowed p = do
-  tokLParenP
+    overOneArgAllowed p = tokLParenP >> do
   args <- grabArgs emptyElemsAllowed finalCommaAllowed singleWSPoss
     overOneArgAllowed p
   return $ case args of

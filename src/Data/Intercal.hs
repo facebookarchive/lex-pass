@@ -29,6 +29,7 @@ instance (Binary a, Binary b) => Binary (Intercal a b) where
     case tag of
       0 -> liftM3 Intercal get get get
       1 -> liftM  Interend get
+      _ -> fail "corrupt"
 
 intercalParser :: Parser a -> Parser b -> Parser (Intercal a b)
 intercalParser a b = do

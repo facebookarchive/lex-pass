@@ -311,6 +311,10 @@ exprParserTable = [
   ial [eptXorWd],
   ial [eptOrWd]]
 
+type ExprOpP = Parser ((Expr, WS) -> (Expr, WS))
+
+type ExprBinOpP = Parser ((Expr, WS) -> (Expr, WS) -> (Expr, WS))
+
 preRep, postRep :: Parser (a -> a) -> Parser (a -> a)
 preRep p = (p >>= \ f -> (f .) <$> preRep p) <|> return id
 postRep p = (p >>= \ f -> (. f) <$> postRep p) <|> return id
@@ -319,40 +323,47 @@ ial, ian :: [Parser (a -> a -> a)] -> [Oper a]
 ial = map $ flip Infix AssocLeft
 ian = map $ flip Infix AssocNone
 
+eptClone, eptPreIncr, eptPreDecr, eptPostIncr, eptPostDecr ::
+    ExprOpP
 eptClone = preOp PrClone tokCloneP
 eptPreIncr = preOp PrIncr tokIncrP
 eptPreDecr = preOp PrDecr tokDecrP
 eptPostIncr = postOp PoIncr tokIncrP
 eptPostDecr = postOp PoDecr tokDecrP
 
-preOp :: PreOp -> Parser a -> Parser ((Expr, WS) -> (Expr, WS))
+preOp :: PreOp -> Parser a -> ExprOpP
 preOp o p = do
   ws1 <- p >> parse
   return . first $ ExprPreOp o ws1
 
-postOp :: PostOp -> Parser a -> Parser ((Expr, WS) -> (Expr, WS))
+postOp :: PostOp -> Parser a -> ExprOpP
 postOp o p = do
   ws2 <- p >> parse
   return $ \ (e, ws1) -> (ExprPostOp o e ws1, ws2)
 
-binOp :: BinOp -> Parser a -> Parser ((Expr, WS) -> (Expr, WS) -> (Expr, WS))
+binOp :: BinOp -> Parser a -> ExprBinOpP
 binOp o p = do
   ws2 <- p >> parse
   return $ \ (e1, ws1) (e2, ws3) -> (ExprBinOp o e1 (ws1, ws2) e2, ws3)
 
+eptBitNot, eptNegate, eptPos, eptSuppress :: ExprOpP
 eptBitNot = preOp PrBitNot tokBitNotP
 eptNegate = preOp PrNegate tokMinusP
 eptPos    = preOp PrPos tokPlusP
 eptSuppress = preOp PrSuppress tokAtP
 
-eptInstOf = do
-  tokInstanceofP
+eptInstOf :: ExprOpP
+eptInstOf = tokInstanceofP >>do
   ws2 <- parse
   (t, ws3) <- lRValOrConstParser
   return $ \ (e, ws1) -> (ExprInstOf e (ws1, ws2) t, ws3)
 
+eptNot :: ExprOpP
 eptNot = preOp PrNot tokNotP
 
+eptMul, eptDiv, eptMod, eptPlus, eptMinus, eptConcat, eptShiftL, eptShiftR,
+    eptLT, eptLE, eptGT, eptGE, eptNEOld, eptEQ, eptNE, eptID, eptNI ::
+    ExprBinOpP
 eptMul = binOp (BByable BMul) tokMulP
 eptDiv = binOp (BByable BDiv) tokDivP
 eptMod = binOp (BByable BMod) tokModP
@@ -371,6 +382,7 @@ eptNE     = binOp BNE     tokNEP
 eptID     = binOp BID     tokIDP
 eptNI     = binOp BNI     tokNIP
 
+eptBitAnd, eptXor, eptBitOr :: ExprBinOpP
 eptBitAnd = binOp (BByable BBitAnd) tokAmpP
 eptXor    = binOp (BByable BXor) tokXorP
 eptBitOr  = binOp (BByable BBitOr) tokBitOrP
