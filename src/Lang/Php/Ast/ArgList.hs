@@ -7,6 +7,14 @@ import Lang.Php.Ast.Common
 import Lang.Php.Ast.Lex
 import qualified Data.Intercal as IC
 
+type ArgList a = Either WS [WSCap a]
+
+argListUnparser :: Unparse a => ArgList a -> String
+argListUnparser x =
+  tokLParen ++
+  either unparse (intercalate tokComma . map unparse) x ++
+  tokRParen
+
 -- e.g. ($a, $b, $c) in f($a, $b, $c) or () in f()
 argListParser :: Parser (a, WS) -> Parser (Either WS [WSCap a])
 argListParser = fmap (map fromRight <$>) .
@@ -25,8 +33,8 @@ mbArgListParser :: Parser (a, WS) -> Parser (Either WS [Either WS (WSCap a)])
 mbArgListParser = genArgListParser True False True True
 
 -- e.g. ($a, $b, $c) in isset($a, $b, $c)
-issetListParser :: Parser (a, WS) -> Parser [WSCap a]
-issetListParser = fmap (map fromRight . fromRight) .
+reqArgListParser :: Parser (a, WS) -> Parser [WSCap a]
+reqArgListParser = fmap (map fromRight . fromRight) .
   genArgListParser False False False True
 
 -- todo: this can just be separate right?

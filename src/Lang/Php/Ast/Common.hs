@@ -20,7 +20,7 @@ module Lang.Php.Ast.Common (
   module Data.Maybe,
   module FUtil,
   WS, WS2, WSElem(..), WSCap(..), WSCap2, capify, wsNoNLParser, w2With,
-  upToCharsOrEndParser) where
+  upToCharsOrEndParser, wsCapParser, toWsParser) where
 
 import Control.Applicative hiding ((<|>), many, optional, Const)
 import Control.Arrow
@@ -118,7 +118,16 @@ capify :: WS -> (a, WS) -> WSCap a
 capify a (b, c) = WSCap a b c
 
 instance (Parse (a, WS)) => Parse (WSCap a) where
-  parse = liftM2 capify parse parse
+  parse = wsToWsCapParser parse
+
+toWsParser :: Parser a -> Parser (a, WS)
+toWsParser p = liftM2 (,) p parse
+
+wsToWsCapParser :: Parser (a, WS) -> Parser (WSCap a)
+wsToWsCapParser = liftM2 capify parse
+
+wsCapParser :: Parser a -> Parser (WSCap a)
+wsCapParser = wsToWsCapParser . toWsParser
 
 instance Parse a => Parse (a, WS) where
   parse = liftM2 (,) parse parse

@@ -1,203 +1,450 @@
-{-# LANGUAGE DeriveDataTypeable, TemplateHaskell, FlexibleInstances,
-             FlexibleContexts, UndecidableInstances #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 module Lang.Php.Ast.StmtParse where
 
+import Control.Monad.Identity
 import Lang.Php.Ast.ArgList
 import Lang.Php.Ast.Common
-import Lang.Php.Ast.Expr
-import Lang.Php.Ast.ExprTypes
 import Lang.Php.Ast.Lex
 import Lang.Php.Ast.StmtTypes
+import Text.ParserCombinators.Parsec.Expr
 import qualified Data.Intercal as IC
 
-instance Unparse Stmt where
-  unparse stmt = case stmt of
-    StmtBlock a -> unparse a
-    StmtBreak iMb w end -> tokBreak ++ unparse iMb ++ unparse w ++ unparse end
-    StmtClass a -> unparse a
-    StmtContinue iMb w end -> tokContinue ++ unparse iMb ++ unparse w ++
-      unparse end
-    StmtDeclare a -> unparse a
-    StmtDoWhile a -> unparse a
-    StmtEcho a end -> tokEcho ++ intercalate tokComma (map unparse a) ++
-      unparse end
-    StmtExpr a b c -> unparse a ++ unparse b ++ unparse c
-    StmtFor a -> unparse a
-    StmtForeach a -> unparse a
-    StmtFuncDef a -> unparse a
-    StmtGlobal a end -> tokGlobal ++
-      intercalate tokComma (map unparse a) ++ unparse end
-    StmtIf a -> unparse a
-    StmtInterface a -> unparse a
-    StmtNamespace n end -> tokNamespace ++ unparse n ++ unparse end
-    StmtNothing end -> unparse end
-    StmtReturn rMb w end -> tokReturn ++ unparse rMb ++ unparse w ++
-      unparse end
-    StmtStatic a end -> tokStatic ++ intercalate tokComma (map unparse a) ++
-      unparse end
-    StmtSwitch a -> unparse a
-    StmtThrow a end -> tokThrow ++ unparse a ++ unparse end
-    StmtTry a cs -> tokTry ++ unparse a ++ unparse cs
-    StmtUnset (WSCap w1 a w2) end -> tokUnset ++ unparse w1 ++ tokLParen ++
-      intercalate tokComma (map unparse a) ++ tokRParen ++ unparse w2 ++
-      unparse end
-    StmtUse n end -> tokUse ++ unparse n ++ unparse end
-    StmtWhile a -> unparse a
+-- Val
 
-instance Unparse StmtEnd where
-  unparse StmtEndSemi = tokSemi
-  unparse (StmtEndClose a) = tokClosePhp ++ unparse a
+instance Parse (Var, WS) where
+  parse = tokDollarP >> (undyn <|> dyn) where
+    undyn = do
+      i <- genIdentifierParser
+      -- try is here unless we combine processing for [expr] vs []
+      (inds, ws) <- IC.breakEnd <$> IC.intercalParser parse (try $
+        (tokLBracketP >> (,) True <$> parse <* tokRBracketP) <|>
+        (tokLBraceP >> (,) False <$> parse <* tokRBraceP))
+      return (Var i inds, ws)
+    dyn = do
+      ws <- parse
+      first (VarDyn ws) <$> parse <|> first (VarDynExpr ws) <$> liftM2 (,)
+        (tokLBraceP >> parse <* tokRBraceP) parse
 
-instance Unparse TopLevel where
-  unparse (TopLevel s echoOrTok) = s ++
-    maybe "" (either ((tokOpenPhpEcho ++) . unparse) ("<?" ++)) echoOrTok
+parseABPairsUntilAOrC :: Parser a -> Parser b -> Parser c ->
+  Parser ([(a, b)], Either a c)
+parseABPairsUntilAOrC a b c = (,) [] . Right <$> c <|> do
+  aR <- a
+  (b >>= \ bR -> first ((aR, bR):) <$> parseABPairsUntilAOrC a b c) <|>
+    return ([], Left aR)
 
-instance (Unparse a) => Unparse (Block a) where
-  unparse (Block a) = tokLBrace ++ unparse a ++ tokRBrace
+dynConstOrConstParser :: Parser (Either DynConst Const, WS)
+dynConstOrConstParser = do
+  (statics, cOrD) <-
+    first (map (\ ((a, b), c) -> (a, (b, c)))) <$>
+    parseABPairsUntilAOrC (liftM2 (,) (tokStaticP <|> identifierParser) parse)
+    (tokDubColonP >> parse) parse
+  return $ case cOrD of
+    Left c -> first (Right . Const statics) c
+    Right d -> first (Left . DynConst statics) d
 
-unparsePre :: [(String, WS)] -> String
-unparsePre = concatMap (\ (a, b) -> a ++ unparse b)
+exprOrLValParser :: Parser (Either Expr LVal, WS)
+exprOrLValParser = try (first Left <$> parse) <|> first Right <$> parse
 
-instance Unparse Class where
-  unparse (Class pre (WSCap w1 name w2) extends impls block) = concat [
-    unparsePre pre, tokClass, unparse w1, name, unparse w2,
-    maybe [] ((tokExtends ++) . unparse) extends,
-    if null impls then []
-      else tokImplements ++ intercalate tokComma (map unparse impls),
-    unparse block]
+instance Parse (Val, WS) where
+  parse = listVal <|> otherVal where
+    listVal = tokListP >> liftM2 (,)
+      (ValLOnlyVal <$> liftM2 LOnlyValList parse (mbArgListParser parse))
+      parse
+    otherVal = do
+      (dOrC, ws) <- dynConstOrConstParser
+      valExtend =<< case dOrC of
+        Left d -> return (ValLRVal $ LRValVar d, ws)
+        Right c -> (first ValROnlyVal <$>) $
+          liftM2 (,)
+            (ROnlyValFunc (Right c) ws <$> argListParser exprOrLValParser)
+            parse
+          <|> return (ROnlyValConst c, ws)
 
-instance Unparse ClassStmt where
-  unparse stmt = case stmt of
-    CStmtVar pre a end -> IC.intercalUnparser id unparse pre ++
-      intercalate tokComma (map unparse a) ++ unparse end
-    CStmtConst a -> cStmtConstUnparser a
-    CStmtFuncDef pre a -> unparsePre pre ++ unparse a
-    CStmtAbstrFunc a -> unparse a
-    CStmtCategory a -> tokCategory ++ a ++ tokSemi
-    CStmtChildren a -> tokChildren ++ a ++ tokSemi
-    CStmtAttribute a -> tokAttribute ++ a ++ tokSemi
+firstM :: (Monad m) => (a -> m b) -> (a, c) -> m (b, c)
+firstM = runKleisli . first . Kleisli
 
-cStmtConstUnparser :: (Unparse a) => [a] -> String
-cStmtConstUnparser vars = tokConst ++
-  intercalate tokComma (map unparse vars) ++ tokSemi
+instance Parse (LVal, WS) where
+  parse = firstM f =<< parse where
+    f r = case r of
+      ValLOnlyVal v -> return $ LValLOnlyVal v
+      ValROnlyVal _ -> fail "Expecting an LVal but found an ROnlyVal."
+      ValLRVal v -> return $ LValLRVal v
 
-instance Unparse AbstrFunc where
-  unparse (AbstrFunc pre ref name args ws end) = concat [unparsePre pre,
-    tokFunction, maybe "" ((++ tokAmp) . unparse) ref, unparse name, tokLParen,
-    either unparse (intercalate tokComma . map unparse) args, tokRParen,
-    unparse ws, unparse end]
+instance Parse (RVal, WS) where
+  parse = firstM f =<< parse where
+    f r = case r of
+      ValLOnlyVal _ -> fail "Expecting an RVal but found an LOnlyVal."
+      ValROnlyVal v -> return $ RValROnlyVal v
+      ValLRVal v -> return $ RValLRVal v
 
-instance (Unparse a) => Unparse (VarEqVal a) where
-  unparse (VarEqVal var w expr) = unparse var ++ w2With tokEquals w ++
-    unparse expr
+instance Parse (LRVal, WS) where
+  parse = firstM f =<< parse where
+    f r = case r of
+      ValLOnlyVal _ -> fail "Expecting an LRVal but found an LOnlyVal."
+      ValROnlyVal _ -> fail "Expecting an LRVal but found an ROnlyVal."
+      ValLRVal v -> return v
 
-instance Unparse FuncArg where
-  unparse (FuncArg const refWs var) = concat [
-    maybe [] (\ (c, w) -> maybe tokArray unparse c ++ unparse w) const,
-    maybe [] ((tokAmp ++) . unparse) refWs, unparse var]
+-- | val extending works like this:
+-- - L --member,index,append--> L
+-- - R --member--> LR
+-- - LR --member,index--> LR
+-- - LR --func--> R
+-- - LR --append--> L
+valExtend :: (Val, WS) -> Parser (Val, WS)
+valExtend v@(state, ws) = case state of
+  ValLOnlyVal a ->
+    do
+      ws2 <- tokArrowP >> parse
+      (memb, wsEnd) <- parse
+      valExtend (ValLOnlyVal $ LOnlyValMemb a (ws, ws2) memb, wsEnd)
+    <|> valExtendIndApp (LValLOnlyVal a) (ValLOnlyVal . LOnlyValInd a ws) ws
+    <|> return v
+  ValROnlyVal a -> valExtendMemb (RValROnlyVal a) ws
+    <|> do
+      ws2 <- tokLBracketP >> parse
+      st <- ValLRVal . LRValInd (RValROnlyVal a) ws . capify ws2 <$>
+        parse <* tokRBracketP
+      valExtend =<< (,) st <$> parse
+    <|> return v
+  ValLRVal a ->
+    do
+      r <- liftM2 (,) (ValROnlyVal . ROnlyValFunc (Left a) ws <$>
+        argListParser exprOrLValParser) parse
+      valExtend r
+    <|> valExtendIndApp (LValLRVal a) (ValLRVal . LRValInd (RValLRVal a) ws) ws
+    <|> valExtendMemb (RValLRVal a) ws
+    <|> return v
 
--- todo: the block form too?  does anyone use it?  declare is terrible anyway..
-instance Unparse Declare where
-  unparse (Declare (WSCap w1 (name, expr) w2) end) = concat [tokDeclare,
-    unparse w1, tokLParen, unparse name, tokEquals, unparse expr, tokRParen,
-    unparse w2, unparse end]
+valExtendMemb :: RVal -> WS -> Parser (Val, WS)
+valExtendMemb a ws = (tokArrowP >> do
+  ws2 <- parse
+  (memb, wsEnd) <- parse
+  valExtend (ValLRVal $ LRValMemb a (ws, ws2) memb, wsEnd))
+		<|> (tokDubColonP >> do
+		  ws2 <- parse
+		  (memb, wsEnd) <- parse
+		  valExtend (ValLRVal $ LRValStaMemb a (ws, ws2) memb, wsEnd))
 
-instance Unparse DoWhile where
-  unparse (DoWhile block (WSCap w1 (WSCap w2 expr w3) w4) end) = concat [tokDo,
-    unparse block, tokWhile, unparse w1, tokLParen, unparse w2, unparse expr,
-    unparse w3, tokRParen, unparse w4, unparse end]
+instance Parse (Memb, WS) where
+  parse =
+    liftM2 (,) (
+      (tokLBraceP >> MembExpr <$> parse <* tokRBraceP) <|>
+      MembStr <$> genIdentifierParser) parse <|>
+    first MembVar <$> parse
 
-instance Unparse For where
-  unparse (For (WSCap w1 (inits, conds, incrs) w2) block) = concat [
-    tokFor, unparse w1, tokLParen,
-    intercalate tokSemi $ map unparse [inits, conds, incrs],
-    tokRParen, unparse w2, unparse block]
+valExtendIndApp :: LVal -> (WSCap Expr -> Val) -> WS -> Parser (Val, WS)
+valExtendIndApp lVal mkVal ws = tokLBracketP >> do
+  ws2 <- parse
+  st <-
+    (tokRBracketP >>
+      return (ValLOnlyVal $ LOnlyValAppend lVal (ws, ws2))) <|>
+    mkVal . capify ws2 <$> (parse <* tokRBracketP)
+  valExtend =<< (,) st <$> parse
 
-instance Unparse ForPart where
-  unparse (ForPart e) = either unparse (intercalate tokComma . map unparse) e
+varOrStringParser :: Parser (Either Var String, WS)
+varOrStringParser = first Left <$> parse <|>
+  liftM2 (,) (Right <$> identifierParser) parse
 
-instance Unparse Foreach where
-  unparse (Foreach (WSCap w1 (expr, dubArrow) w2) block) = concat [tokForeach,
-    unparse w1, tokLParen, unparse expr, tokAs, unparse dubArrow, tokRParen,
-    unparse w2, unparse block]
+instance Parse (DynConst, WS) where
+  parse = do
+    statics <- many . liftM2 (,) identifierParser . liftM2 (,) parse $
+      tokDubColonP >> parse
+    first (DynConst statics) <$> parse
 
-instance Unparse Func where
-  unparse (Func w1 ref name (WSCap w2 args w3) block) = concat [tokFunction,
-    unparse w1, maybe [] ((tokAmp ++) . unparse) ref, name, unparse w2,
-    tokLParen, argsUnparser args, tokRParen, unparse w3, unparse block]
+instance Parse (Const, WS) where
+  parse = first (uncurry Const) . rePairLeft . first (map rePairRight) .
+    IC.breakEnd <$> IC.intercalParser (liftM2 (,) identifierParser parse)
+    (tokDubColonP >> parse)
 
-argsUnparser :: (Unparse t, Unparse s) => Either t [s] -> String
-argsUnparser = either unparse (intercalate tokComma . map unparse)
+lRValOrConstParser :: Parser (Either LRVal Const, WS)
+lRValOrConstParser = do
+  (v, w) <- parse
+  case v of
+    ValLRVal a -> return (Left a, w)
+    ValROnlyVal (ROnlyValConst a) -> return (Right a, w)
+    _ -> fail "Expected LRVal or Const but fould a different Val type."
 
-instance Unparse If where
-  unparse (If isColon ifAndIfelses theElse) =
-    tokIf ++ unparseIfBlock isColon theIf ++
-    concatMap doIfelse ifelses ++
-    maybe [] (\ (w1And2, blockOrStmt) -> w2With tokElse w1And2 ++
-      colonUnparseBlockOrStmt isColon blockOrStmt) theElse ++
-    if isColon then tokEndif else ""
-    where
-    (theIf, ifelses) = IC.breakStart ifAndIfelses
-    doElsery Nothing = tokElseif
-    doElsery (Just ws) = tokElse ++ unparse ws ++ tokIf
-    doIfelse ((ws, elsery), ifBlock) =
-      unparse ws ++ doElsery elsery ++ unparseIfBlock isColon ifBlock
-    mbColon = if isColon then tokColon else ""
+-- Expr
 
-colonUnparseBlockOrStmt :: Bool -> BlockOrStmt -> String
-colonUnparseBlockOrStmt isColon (Right (Block body)) = if isColon
-  then tokColon ++ unparse body
-  else unparse (Block body)
-colonUnparseBlockOrStmt isColon (Left stmt) = if isColon
-  -- We could just unparse the statement (which should be a one-statement
-  -- block).  But it's probably better to yell on this invariant violation.
-  then error "Colon notation should only use blocks."
-  else unparse stmt
+instance Parse (Expr, WS) where
+  parse = buildExpressionParser exprParserTable simpleExprParser
 
-unparseIfBlock :: Bool -> IfBlock -> String
-unparseIfBlock isColon (IfBlock (WSCap w1 expr w2) blockOrStmt) =
-  concat [unparse w1, tokLParen, unparse expr, tokRParen, unparse w2] ++
-  colonUnparseBlockOrStmt isColon blockOrStmt
+simpleExprParser :: Parser (Expr, WS)
+simpleExprParser = assignOrRValParser
+  <|> do
+    ws1 <- tokLParenP >> parse
+    ambigCastParser ws1 <|> castOrParenParser ws1
+  <|> do
+    ws1 <- tokNewP >> parse
+    (v, ws2) <- parse
+    argsWSMb <- optionMaybe $ argListParser parse
+    case argsWSMb of
+      Just args -> (,) (ExprNew ws1 v $ Just (ws2, args)) <$> parse
+      _ -> return (ExprNew ws1 v Nothing, ws2)
+  <|> includeParser
+  <|> do
+    isExit <- return True <$> tokExitP <|> return False <$> tokDieP
+    ws1 <- parse
+    argMb <- optionMaybe $ exitListParser parse
+    case argMb of
+      Just arg -> (,) (ExprExit isExit $ Just (ws1, arg)) <$> parse
+      _ -> return (ExprExit isExit Nothing, ws1)
+  <|> do
+    w <- tokAmpP >> parse
+    first (ExprRef w . Right) <$> parse <|> do
+      (e, wEnd) <- parse
+      case e of
+        ExprNew _ _ _ -> return (ExprRef w (Left e), wEnd)
+        _ -> fail "Expecting a Val or ExprNew."
+  <|> liftM2 (,) (
+    ExprStrLit <$> parse <|>
+    ExprNumLit <$> parse <|>
+    ExprHereDoc <$> parse <|>
+    ExprAnonFunc <$> parse <|>
+    (tokArrayP >> liftM2 ExprArray parse (arrListParser parse)) <|>
+    funclike1Parser ExprEmpty tokEmptyP <|>
+    funclike1Parser ExprEval tokEvalP <|>
+    (tokIssetP >> liftM2 ExprIsset parse (reqArgListParser parse)) <|>
+    ExprBackticks <$> backticksParser <|>
+    ExprXml <$> parse
+    ) parse
 
-instance Unparse Interface where
-  unparse (Interface name extends block) = concat [tokInterface, unparse name,
-    if null extends then []
-      else tokExtends ++ intercalate tokComma (map unparse extends),
-    unparse block]
+ambigCastParser :: WS -> Parser (Expr, WS)
+ambigCastParser ws1 = try $ do
+  i <- identsCI ["array", "unset"]
+  ws2 <- parse
+  ws3 <- tokRParenP >> parse
+  first (ExprCast (WSCap ws1 i ws2) ws3) <$> parse
 
-instance Unparse IfaceStmt where
-  unparse (IfaceConst vars) = cStmtConstUnparser vars
-  unparse (IfaceFunc a) = unparse a
+castOrParenParser :: WS -> Parser (Expr, WS)
+castOrParenParser ws1 = do
+  iMb <- optionMaybe $ identsCI ["int", "integer", "bool", "boolean",
+    "float", "double", "real", "string", "binary", "object"]
+  case iMb of
+    Just i -> do
+      ws2 <- parse
+      ws3 <- tokRParenP >> parse
+      first (ExprCast (WSCap ws1 i ws2) ws3) <$> parse
+    _ -> liftM2 (,) (ExprParen . capify ws1 <$> parse <* tokRParenP) parse
 
-instance Unparse Namespace where
-    unparse (Namespace n) = n
+assignOrRValParser :: Parser (Expr, WS)
+assignOrRValParser = do
+  (val, w) <- parse
+  case val of
+    ValLOnlyVal v -> assignCont (LValLOnlyVal v) w
+    ValLRVal v -> assignCont (LValLRVal v) w <|>
+      return (ExprRVal $ RValLRVal v, w)
+    ValROnlyVal v -> return (ExprRVal $ RValROnlyVal v, w)
 
-instance Unparse Use where
-  unparse (Use n) = n
+assignCont :: LVal -> WS -> Parser (Expr, WS)
+assignCont l w1 = do
+  o <- (tokEqualsP >> return Nothing) <|> Just <$> (
+    (tokPlusByP   >> return BPlus) <|>
+    (tokMinusByP  >> return BMinus) <|>
+    (tokMulByP    >> return BMul) <|>
+    (tokDivByP    >> return BDiv) <|>
+    (tokConcatByP >> return BConcat) <|>
+    (tokModByP    >> return BMod) <|>
+    (tokBitAndByP >> return BBitAnd) <|>
+    (tokBitOrByP  >> return BBitOr) <|>
+    (tokXorByP    >> return BXor) <|>
+    (tokShiftLByP >> return BShiftL) <|>
+    (tokShiftRByP >> return BShiftR))
+  w2 <- parse
+  first (ExprAssign o l (w1, w2)) <$> parse
 
-instance Unparse VarMbVal where
-  unparse (VarMbVal var exprMb) = unparse var ++ maybe []
-    (\ (w, expr) -> w2With tokEquals w ++ unparse expr) exprMb
+includeParser :: Parser (Expr, WS)
+includeParser = try $ do
+  i <- map toLower <$> genIdentifierParser
+  f <- if i == tokRequireOnce then return $ ExprInclude Req Once else
+    if i == tokIncludeOnce then return $ ExprInclude Inc Once else
+    if i == tokRequire then return $ ExprInclude Req NotOnce else
+    if i == tokInclude then return $ ExprInclude Inc NotOnce else
+    fail "Expecting an include/require expression."
+  ws <- parse
+  first (f ws) <$> parse
 
-instance Unparse Switch where
-  unparse (Switch (WSCap w1 expr w2) w3 cases) = concat [tokSwitch, unparse w1,
-    tokLParen, unparse expr, tokRParen, unparse w2, tokLBrace, unparse w3,
-    unparse cases, tokRBrace]
+instance Parse (DubArrowMb, WS) where
+  parse = do
+    (k, ws) <- parse
+    vMb <- optionMaybe (tokDubArrowP >> liftM2 (,) parse parse)
+    return $ case vMb of
+      Just (ws2, (v, ws3)) -> (DubArrowMb (Just (k, (ws, ws2))) v, ws3)
+      _ -> (DubArrowMb Nothing k, ws)
 
-instance Unparse Case where
-  unparse (Case expr stmtList) =
-    either ((tokDefault ++) . unparse) ((tokCase ++) . unparse) expr ++
-    tokColon ++ unparse stmtList
+funclike1Parser :: (Parse (a, WS)) => (WS -> WSCap a -> b) -> Parser c ->
+  Parser b
+funclike1Parser constr tokP = liftM2 constr (tokP >> parse)
+  (tokLParenP >> parse <* tokRParenP)
 
-instance Unparse Catch where
-  unparse (Catch (WSCap w1 (const, expr) w2) w3 block) = concat [tokCatch,
-    unparse w1, tokLParen, unparse const, unparse expr,
-    unparse w2, tokRParen, unparse w3, unparse block]
+exprParserTable :: [[Oper (Expr, WS)]]
+exprParserTable = [
+  [Postfix eptIndex],
+  [Prefix eptClone],
+  [Prefix eptPreIncr, Prefix eptPreDecr,
+   Postfix eptPostIncr, Postfix eptPostDecr],
+  [Postfix eptInstOf],
+  [Prefix . preRep $ eptNot <|> eptBitNot <|> eptNegate <|> eptPos <|>
+    eptSuppress],
+  ial [eptMul, eptDiv, eptMod],
+  ial [eptPlus, eptMinus, eptConcat],
+  ial [eptShiftL, eptShiftR],
+  ian [eptLT, eptLE, eptGT, eptGE, eptNEOld],
+  ian [eptEQ, eptNE, eptID, eptNI],
+  ial [eptBitAnd],
+  ial [eptXor],
+  ial [eptBitOr],
+  [Prefix eptPrint],
+  ial [eptAnd],
+  ial [eptOr],
+  [Postfix eptTernaryIf],
+  ial [eptAndWd],
+  ial [eptXorWd],
+  ial [eptOrWd]]
 
-instance Unparse While where
-  unparse (While (WSCap w1 expr w2) block) = concat [tokWhile, unparse w1,
-    tokLParen, unparse expr, tokRParen, unparse w2, unparse block]
+preRep, postRep :: Parser (a -> a) -> Parser (a -> a)
+preRep p = (p >>= \ f -> (f .) <$> preRep p) <|> return id
+postRep p = (p >>= \ f -> (. f) <$> postRep p) <|> return id
+
+ial, ian :: [Parser (a -> a -> a)] -> [Oper a]
+ial = map $ flip Infix AssocLeft
+ian = map $ flip Infix AssocNone
+
+eptClone = preOp PrClone tokCloneP
+eptPreIncr = preOp PrIncr tokIncrP
+eptPreDecr = preOp PrDecr tokDecrP
+eptPostIncr = postOp PoIncr tokIncrP
+eptPostDecr = postOp PoDecr tokDecrP
+
+preOp :: PreOp -> Parser a -> Parser ((Expr, WS) -> (Expr, WS))
+preOp o p = do
+  ws1 <- p >> parse
+  return . first $ ExprPreOp o ws1
+
+postOp :: PostOp -> Parser a -> Parser ((Expr, WS) -> (Expr, WS))
+postOp o p = do
+  ws2 <- p >> parse
+  return $ \ (e, ws1) -> (ExprPostOp o e ws1, ws2)
+
+binOp :: BinOp -> Parser a -> Parser ((Expr, WS) -> (Expr, WS) -> (Expr, WS))
+binOp o p = do
+  ws2 <- p >> parse
+  return $ \ (e1, ws1) (e2, ws3) -> (ExprBinOp o e1 (ws1, ws2) e2, ws3)
+
+eptBitNot = preOp PrBitNot tokBitNotP
+eptNegate = preOp PrNegate tokMinusP
+eptPos    = preOp PrPos tokPlusP
+eptSuppress = preOp PrSuppress tokAtP
+
+eptInstOf = do
+  tokInstanceofP
+  ws2 <- parse
+  (t, ws3) <- lRValOrConstParser
+  return $ \ (e, ws1) -> (ExprInstOf e (ws1, ws2) t, ws3)
+
+eptNot = preOp PrNot tokNotP
+
+eptMul = binOp (BByable BMul) tokMulP
+eptDiv = binOp (BByable BDiv) tokDivP
+eptMod = binOp (BByable BMod) tokModP
+eptPlus   = binOp (BByable BPlus) tokPlusP
+eptMinus  = binOp (BByable BMinus) tokMinusP
+eptConcat = binOp (BByable BConcat) tokConcatP
+eptShiftL = binOp (BByable BShiftL) tokShiftLP
+eptShiftR = binOp (BByable BShiftR) tokShiftRP
+eptLT     = binOp BLT     tokLTP
+eptLE     = binOp BLE     tokLEP
+eptGT     = binOp BGT     tokGTP
+eptGE     = binOp BGE     tokGEP
+eptNEOld  = binOp BNEOld  tokNEOldP
+eptEQ     = binOp BEQ     tokEQP
+eptNE     = binOp BNE     tokNEP
+eptID     = binOp BID     tokIDP
+eptNI     = binOp BNI     tokNIP
+
+eptBitAnd = binOp (BByable BBitAnd) tokAmpP
+eptXor    = binOp (BByable BXor) tokXorP
+eptBitOr  = binOp (BByable BBitOr) tokBitOrP
+
+eptPrint  = preOp PrPrint tokPrintP
+
+eptAnd    = binOp BAnd    tokAndP
+eptOr     = binOp BOr     tokOrP
+
+eptTernaryIf :: Parser ((Expr, WS) -> (Expr, WS))
+eptTernaryIf = do
+  w2 <- tokQMarkP >> parse
+  (e2, w3) <- maybe (Nothing, []) (first Just) <$> parse
+  w4 <- tokColonP >> parse
+  (e3, w5) <- parse
+  return $ \ (e1, w1) ->
+    (ExprTernaryIf $ TernaryIf e1 (w1, w2) e2 (w3, w4) e3, w5)
+
+eptAndWd = binOp BAndWd tokAndWdP
+eptXorWd = binOp BXorWd tokXorWdP
+eptOrWd  = binOp BOrWd  tokOrWdP
+
+eptIndex :: Parser ((Expr, WS) -> (Expr, WS))
+eptIndex = do
+  e2 <- tokLBracketP >> parse
+  w2 <- tokRBracketP >> parse
+  return $ \ (e1, w1) -> (ExprIndex e1 w1 e2, w2)
+
+instance Parse Xml where
+  parse = tokLTP >> do
+    tag <- many1 . oneOf $
+      -- i thought _ wasn't allowed but i guess when marcel's away e will play
+      [':', '-', '_'] ++ ['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9']
+    attrs <- IC.intercalParser parse . liftM2 (,) xmlIdentifierParser $
+      Just <$> try (liftM2 (,) (liftM2 (,) parse (tokEqualsP >> parse)) $
+        (tokLBraceP >> Right <$> parse <* tokRBraceP) <|>
+        Left <$> parse) <|>
+      return Nothing
+    content <- (tokDivP >> tokGTP >> return Nothing) <|>
+      Just <$> liftM2 (,)
+        (tokGTP >> many (Right <$> try parse <|> Left <$> parse))
+        (tokLTP >> tokDivP >> ((string tag >> return True) <|> return False))
+        <* tokGTP
+    return $ Xml tag attrs content
+
+instance Parse XmlLitOrExpr where
+  parse = (tokLBraceP >> XmlExpr <$> parse <* tokRBraceP) <|>
+    XmlLit <$> many1 (satisfy (`notElem` "<{"))
+
+instance Parse (FuncArg, WS) where
+  parse = do
+    t <- optionMaybe
+      (first Just <$> parse <|> (tokArrayP >> (,) Nothing <$> parse))
+    ref <- optionMaybe (tokAmpP >> parse)
+    first (FuncArg t ref) <$> parse
+
+instance Parse AnonFuncUse where
+  parse = tokUseP >>
+    AnonFuncUse <$> wsCapParser (reqArgListParser parse)
+
+-- We parse functions in two parts to disambiguate functions and anonymous
+-- functions at top-level without using (try).
+funcStartParser = tokFunctionP >> liftM2 (,)
+  parse
+  ((tokAmpP >> Just <$> parse) <|> return Nothing)
+
+anonFuncContParser (w, ampMb) = liftM3 (AnonFunc w ampMb)
+  (wsCapParser $ argListParser parse)
+  parse
+  parse
+
+funcContParser (w, ampMb) = liftM3 (Func w ampMb)
+  identifierParser
+  (wsCapParser $ argListParser parse)
+  parse
+
+instance Parse AnonFunc where
+  parse = funcStartParser >>= anonFuncContParser
+
+-- Stmt
 
 stmtListP :: Parser StmtList
 stmtListP = liftM2 IC.unbreakStart parse parse
@@ -221,8 +468,8 @@ simpleStmtParser =
   StmtDoWhile <$> parse <|>
   liftM2 StmtEcho (tokEchoP >> sepBy1 parse tokCommaP) parse <|>
   (try $ liftM2 StmtStatic (tokStaticP >> sepBy1 parse tokCommaP) parse) <|>
-  liftM2 (uncurry StmtExpr) parse parse <|>
-  StmtFuncDef <$> parse <|>
+  funcParser <|>
+  stmtExprParser <|>
   liftM2 StmtGlobal (tokGlobalP >> sepBy1 parse tokCommaP) parse <|>
   liftM2 StmtNamespace (tokNamespaceP >> parse) parse <|>
   liftM2 StmtUse (tokUseP >> parse) parse <|>
@@ -232,11 +479,17 @@ simpleStmtParser =
   StmtSwitch <$> parse <|>
   liftM2 StmtThrow (tokThrowP >> parse) parse <|>
   liftM2 StmtUnset
-    (tokUnsetP >> liftM3 WSCap parse (issetListParser parse) parse)
+    (tokUnsetP >> wsCapParser (reqArgListParser parse))
     parse
 
+stmtExprParser :: Parser Stmt
+stmtExprParser = stmtExprContParser parse
+
+stmtExprContParser :: Parser (Expr, WS) -> Parser Stmt
+stmtExprContParser p = liftM2 (uncurry StmtExpr) p parse
+
 ifCondP :: Parser (WSCap2 Expr)
-ifCondP = liftM3 WSCap parse (tokLParenP >> parse <* tokRParenP) parse
+ifCondP = wsCapParser $ tokLParenP >> parse <* tokRParenP
 
 instance Parse (If, WS) where
   parse = tokIfP >> do
@@ -360,7 +613,7 @@ breaklikeParser constr p = p >> do
 instance Parse Class where
   parse = liftM5 Class
     (many (liftM2 (,) (tokAbstractP <|> tokFinalP) parse))
-    (tokClassP >> liftM3 WSCap parse identifierParser parse)
+    (tokClassP >> wsCapParser identifierParser)
     (optionMaybe $ tokExtendsP >> parse)
     ((tokImplementsP >> sepBy1 parse tokCommaP) <|> return [])
     parse
@@ -417,15 +670,11 @@ classFuncParser pre = CStmtFuncDef pre <$> parse
 
 classAbstrFuncParser :: (AbstrFunc -> c) -> [(String, WS)] -> Parser c
 classAbstrFuncParser constr pre = constr <$> liftM5 (AbstrFunc pre)
-  (tokFunctionP >> optionMaybe (try $ parse <* tokAmpP)) parse
-  (argListParser parse) parse parse
-
-instance Parse (FuncArg, WS) where
-  parse = do
-    t <- optionMaybe
-      (first Just <$> parse <|> (tokArrayP >> (,) Nothing <$> parse))
-    ref <- optionMaybe (tokAmpP >> parse)
-    first (FuncArg t ref) <$> parse
+  (tokFunctionP >> optionMaybe (try $ parse <* tokAmpP))
+  parse
+  (argListParser parse)
+  parse
+  parse
 
 unsnoc :: [a] -> ([a], a)
 unsnoc = first reverse . swap . uncons . reverse
@@ -439,13 +688,14 @@ classVarsParser pre = let (preInit, (s, w)) = unsnoc pre in
 
 instance Parse Declare where
   parse = tokDeclareP >> liftM2 Declare
-    (liftM3 WSCap parse (tokLParenP >>
-      liftM2 (,) parse (tokEqualsP >> parse)) (tokRParenP >> parse))
+    (wsCapParser $
+      tokLParenP >> liftM2 (,) parse (tokEqualsP >> parse) <* tokRParenP)
     parse
 
 instance Parse DoWhile where
-  parse = liftM3 DoWhile (tokDoP >> parse) (tokWhileP >>
-      liftM3 WSCap parse (tokLParenP >> parse <* tokRParenP) parse)
+  parse = liftM3 DoWhile
+    (tokDoP >> parse)
+    (tokWhileP >> wsCapParser (tokLParenP >> parse <* tokRParenP))
     parse
 
 instance (Parse (a, WS), Parse (b, WS)) => Parse (Either a b, WS) where
@@ -453,8 +703,9 @@ instance (Parse (a, WS), Parse (b, WS)) => Parse (Either a b, WS) where
 
 instance Parse (For, WS) where
   parse = tokForP >> do
-    h <- liftM3 WSCap parse (tokLParenP >> liftM3 (,,) parse
-      (tokSemiP >> parse <* tokSemiP) parse <* tokRParenP) parse
+    h <- wsCapParser $ tokLParenP >>
+      liftM3 (,,) parse (tokSemiP >> parse <* tokSemiP) parse
+      <* tokRParenP
     first (For h) <$> parse
 
 instance Parse ForPart where
@@ -468,15 +719,30 @@ forPartExpry w1 = ForPart . Right <$>
 
 instance Parse (Foreach, WS) where
   parse = tokForeachP >> do
-    h <- liftM3 WSCap parse
-      (tokLParenP >> liftM2 (,) parse (tokAsP >> parse) <* tokRParenP)
-      parse
+    h <- wsCapParser $
+      tokLParenP >> liftM2 (,) parse (tokAsP >> parse) <* tokRParenP
     first (Foreach h) <$> parse
 
+funcParser :: Parser Stmt
+funcParser = do
+  start <- funcStartParser
+  StmtFuncDef <$> funcContParser start <|>
+    -- We should actually implement something here like:
+    --   exprContParser :: (Expr, WS) -> Parser (Expr, WS)
+    -- since weird things like
+    --   function (){} + 4;
+    -- are grammatical even at top-level
+    -- (just generates a warning a.k.a. a PHP "notice").
+    -- Instead we use the less general stmtExprContParser,
+    -- because such weird things are crazy anyway and this is easy for now.
+    -- I believe there's actually no use to ever having a statement
+    -- start-with/be an anon func anyway.  But we'll play along,
+    -- allowing a statement to be an anon func at least.
+    stmtExprContParser (toWsParser $
+      ExprAnonFunc <$> anonFuncContParser start)
+
 instance Parse Func where
-  parse = tokFunctionP >> liftM5 Func parse
-    ((tokAmpP >> Just <$> parse) <|> return Nothing) identifierParser
-    (liftM3 WSCap parse (argListParser parse) parse) parse
+  parse = funcStartParser >>= funcContParser
 
 instance Parse Interface where
   parse = tokInterfaceP >> liftM3 Interface
@@ -501,7 +767,7 @@ instance Parse IfaceStmt where
 
 instance Parse Switch where
   parse = tokSwitchP >> liftM3 Switch
-    (liftM3 WSCap parse (tokLParenP >> parse <* tokRParenP) parse)
+    (wsCapParser $ tokLParenP >> parse <* tokRParenP)
     (tokLBraceP >> parse)
     parse <* tokRBraceP
 
@@ -512,7 +778,7 @@ instance Parse Case where
 
 instance Parse (While, WS) where
   parse = tokWhileP >> do
-    e <- liftM3 WSCap parse (tokLParenP >> parse <* tokRParenP) parse
+    e <- wsCapParser $ tokLParenP >> parse <* tokRParenP
     first (While e) <$> parse
 
 instance Parse (a, WS) => Parse (Block a) where
@@ -532,4 +798,3 @@ instance Parse TopLevel where
 instance Parse StmtEnd where
   parse = (tokSemiP >> return StmtEndSemi) <|>
     (tokClosePhpP >> StmtEndClose <$> parse)
-

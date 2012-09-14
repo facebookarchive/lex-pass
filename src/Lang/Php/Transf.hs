@@ -4,7 +4,6 @@ import Control.Applicative
 import Lang.Php.Ast
 import Lang.Php.Ast.Common
 import Lang.Php.Ast.Stmt
-import Lang.Php.Ast.StmtTypes
 import LexPassUtil
 import Numeric
 import qualified Data.Intercal as IC
