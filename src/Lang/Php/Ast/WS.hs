@@ -11,7 +11,6 @@ module Lang.Php.Ast.WS where
 
 import Data.Binary
 import Data.Data
-import Data.DeriveTH
 import Text.PrettyPrint.GenericPretty
 
 import Common

@@ -5,7 +5,6 @@ module Data.List.NonEmpty where
 
 import Data.Binary
 import Data.Data
-import Data.DeriveTH
 import qualified Data.List as L
 import Text.PrettyPrint.GenericPretty
 
