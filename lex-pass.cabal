@@ -21,7 +21,7 @@ executable lex-pass
   main-is:        Main.hs
   build-depends:  FUtil, HSH >= 2, MissingH, base >= 4, binary, bytestring,
                   containers, derive, directory, filepath, mtl, parsec == 3.*,
-                  process, syb, regex-compat
+                  process, syb
   ghc-options:    -threaded
 
 executable lex-pass-test

@@ -12,7 +12,6 @@ import System.Environment
 import System.FilePath
 import System.IO
 import System.Process
-import Text.Regex
 
 import CodeGen.Transf
 import LexPassUtil
@@ -92,9 +91,7 @@ main = do
         transf = lookupTrans transfName
       subPaths <- map killInitialDotSlash <$> if optFiles opts
         then getContents >>= return . lines
-	else Config.sourceFiles (transfTypes transf)
-		 (maybe [] (\p -> splitRegex (mkRegex ",") p) (optExclPats opts))
-		 dir
+        else Config.sourceFiles (transfTypes transf) dir
       let
         subPaths' = case optStartAtFile opts of
           Nothing -> subPaths

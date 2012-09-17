@@ -7,7 +7,6 @@ data Options = Options {
   optNumCores         :: Int,
   optFiles            :: Bool,
   optDir              :: Maybe String,
-  optExclPats         :: Maybe String,
   optStartAtFile      :: Maybe String}
   deriving Show
 
@@ -17,7 +16,6 @@ defaultOptions = Options {
   optNumCores         = 1,
   optFiles            = False,
   optDir              = Nothing,
-  optExclPats         = Nothing,
   optStartAtFile      = Nothing}
 
 options :: [OptDescr (Options -> Options)]
@@ -34,9 +32,6 @@ options = [
     \files of interest.  Abstract syntax trees\n\
     \will be cached in top-level .ast/\n\
     \directory.",
-  Option "e" ["exclude"]
-    (ReqArg (\ d opts -> opts {optExclPats = Just d}) "<patterns>")
-    "Exclude files patterns. ",
   Option "f" ["files"]
     (NoArg (\ opts -> opts {optFiles = True}))
     "Pass a specific list of files to stdin\n\
