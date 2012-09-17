@@ -1,11 +1,23 @@
-{-# LANGUAGE DeriveDataTypeable, TemplateHaskell #-}
-
 module Lang.Php.Ast.ArgList where
 
 import Data.Either.Utils
+
+import qualified Data.List.NonEmpty as NE
 import Lang.Php.Ast.Common
 import Lang.Php.Ast.Lex
-import qualified Data.Intercal as IC
+
+type ArgList a = Either WS [WSCap a]
+
+type ReqArgList a = NE.NonEmpty (WSCap a)
+
+argListUnparser :: Unparse a => Unparser (ArgList a)
+argListUnparser x =
+  tokLParen ++
+  either unparse (intercalate tokComma . map unparse) x ++
+  tokRParen
+
+reqArgListUnparser :: Unparse a => Unparser (ReqArgList a)
+reqArgListUnparser = argListUnparser . Right . NE.toList
 
 -- e.g. ($a, $b, $c) in f($a, $b, $c) or () in f()
 argListParser :: Parser (a, WS) -> Parser (Either WS [WSCap a])
@@ -25,9 +37,9 @@ mbArgListParser :: Parser (a, WS) -> Parser (Either WS [Either WS (WSCap a)])
 mbArgListParser = genArgListParser True False True True
 
 -- e.g. ($a, $b, $c) in isset($a, $b, $c)
-issetListParser :: Parser (a, WS) -> Parser [WSCap a]
-issetListParser = fmap (map fromRight . fromRight) .
-  genArgListParser False False False True
+reqArgListParser :: Parser (a, WS) -> Parser (ReqArgList a)
+reqArgListParser p = fromJust . NE.fromList . map fromRight . fromRight <$>
+  genArgListParser False False False True p
 
 -- todo: this can just be separate right?
 -- e.g. ($a) in exit($a) or () in exit()
@@ -38,8 +50,7 @@ exitListParser = fmap (fmap (fromRight . head)) .
 genArgListParser :: Bool -> Bool -> Bool -> Bool -> Parser (a, WS) ->
   Parser (Either WS [Either WS (WSCap a)])
 genArgListParser emptyElemsAllowed finalCommaAllowed singleWSPoss
-    overOneArgAllowed p = do
-  tokLParenP
+    overOneArgAllowed p = tokLParenP >> do
   args <- grabArgs emptyElemsAllowed finalCommaAllowed singleWSPoss
     overOneArgAllowed p
   return $ case args of
@@ -66,4 +77,3 @@ grabArgs emptyElemsAllowed finalCommaAllowed isFirstArgAndWSPoss
       grabArgs emptyElemsAllowed finalCommaAllowed False overOneArgAllowed p
   (arg:) <$> (if canContinue then ((tokCommaP >> cont) <|>) else id)
     (tokRParenP >> return [])
-

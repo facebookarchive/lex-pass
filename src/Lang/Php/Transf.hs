@@ -1,12 +1,12 @@
 module Lang.Php.Transf where
 
 import Control.Applicative
-import Lang.Php.Ast
-import Lang.Php.Ast.Common
-import Lang.Php.Ast.Stmt
-import Lang.Php.Ast.StmtTypes
-import LexPassUtil
+import FUtil
 import Numeric
+
+import Lang.Php.Ast
+import Lang.Php.Ast.Stmt
+import LexPassUtil
 import qualified Data.Intercal as IC
 
 -- ignores single-statement if/etc blocks currently
@@ -27,8 +27,8 @@ modAllStmts f = modIntercal $ \ wsPre s wsPost -> case f wsPre s wsPost of
         (\ a -> x {forBlock = Right a}) <$> doBlock block
       StmtForeach (x@Foreach {foreachBlock = Right block}) -> StmtForeach .
         (\ a -> x {foreachBlock = Right a}) <$> doBlock block
-      StmtIf (If ifAndIfelses theElse) -> StmtIf <$> liftA2 If
-        (IC.mapA ifery pure ifAndIfelses) (elsery theElse)
+      StmtIf (If isColon ifAndIfelses theElse) -> StmtIf <$> liftA2
+        (If isColon) (IC.mapA ifery pure ifAndIfelses) (elsery theElse)
         where
         ifery (x@(IfBlock {ifBlockBlock = Right block})) =
           (\ a -> x {ifBlockBlock = Right a}) <$> doBlock block

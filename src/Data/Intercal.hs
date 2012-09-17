@@ -1,8 +1,8 @@
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveGeneric #-}
 
 module Data.Intercal where
 
-import Common
 import Control.Arrow
 import Control.Applicative
 import Control.Monad
@@ -11,19 +11,13 @@ import Data.Data
 import Prelude hiding (concatMap, map)
 import qualified Prelude
 
-data Intercal a b = Intercal a b (Intercal a b) | Interend a
-  deriving (Eq, Show, Typeable, Data)
+import Common
+import Parse
+import Unparse
+import Text.PrettyPrint.GenericPretty
 
--- we're using method that should be faster-but-bigger instead of storing
--- length.  this is probably the same as the derive one, just use that?
-instance (Binary a, Binary b) => Binary (Intercal a b) where
-  put (Intercal x y r) = put (0 :: Word8) >> put x >> put y >> put r
-  put (Interend x)     = put (1 :: Word8) >> put x
-  get = do
-    tag <- getWord8
-    case tag of
-      0 -> liftM3 Intercal get get get
-      1 -> liftM  Interend get
+data Intercal a b = Intercal a b (Intercal a b) | Interend a
+  deriving (Data, Eq, Generic, Show, Typeable)
 
 intercalParser :: Parser a -> Parser b -> Parser (Intercal a b)
 intercalParser a b = do
@@ -105,3 +99,4 @@ append :: a -> b -> Intercal b a -> Intercal b a
 append a b (Interend b0) = Intercal b0 a $ Interend b
 append a b (Intercal b0 a0 rest) = Intercal b0 a0 $ append a b rest
 
+instance (Out a, Out b) => Out (Intercal a b)

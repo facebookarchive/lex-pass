@@ -7,7 +7,6 @@ import Control.Monad.State
 import Data.Binary
 import Data.Data
 import Data.Generics
-import Data.String
 import FUtil
 import HSH
 import Lang.Php.Ast
@@ -16,9 +15,9 @@ import System.Directory
 import System.FilePath
 import System.IO
 import System.Process
+import Text.Parsec.Prim (Parsec)
+import qualified Data.ByteString.Char8 as BSC
 import qualified Data.Intercal as IC
-
-import Text.Parsec.Prim(Parsec)
 
 --
 -- transf framework
@@ -79,7 +78,7 @@ lexPass transf opts codeDir subPath total cur = do
       return (False, infoLines)
     Transformed {infoLines = infoLines, transfResult = Just ast'} -> io $ do
       hPutStrLn stderr "- Saving"
-      writeFile (codeDir </> subPath) $ unparse ast'
+      writeSrcFile (codeDir </> subPath) $ unparse ast'
       encodeFile (astPath codeDir subPath) ast'
       return (True, infoLines)
 
@@ -170,6 +169,19 @@ astPath codeDir subPath = codeDir </> ".ast" </> subPath ++ ".ast"
 transfModsFile :: Parsec s (Bool, b) ()
 transfModsFile = updateState ((,) True . snd)
 
+-- - When we read a source file it must be done strictly since we also
+--   overwrite the files in place when transforming.
+-- - Unfortunately there are PHP files that are not UTF8.  For example
+--   WordPress uses a bare 0xA9 byte for "©".  So we probably have to just
+--   work at the byte level, which may be best for performance anyway.
+-- - But all the parsing stuff uses String right now, so I'm hackily
+--   shoving byte streams into Strings for now.
+readSrcFile :: FilePath -> IO String
+readSrcFile f = BSC.unpack <$> BSC.readFile f
+
+writeSrcFile :: FilePath -> String -> IO ()
+writeSrcFile f = BSC.writeFile f . BSC.pack
+
 -- combine these into AnAst?
 parseAndCache :: (Binary a, Parse a, Unparse a) =>
   Bool -> FilePath -> FilePath -> IO a
@@ -178,7 +190,7 @@ parseAndCache cacheAsts codeDir subPath = do
     astFilename = astPath codeDir subPath
     regen = do
       hPutStrLn stderr "- Parsing"
-      c <- readFile $ codeDir </> subPath
+      c <- readSrcFile $ codeDir </> subPath
       case runParser parse () subPath c of
         Left err -> error $ show err
         Right ast -> do
@@ -197,7 +209,7 @@ parseAndCache cacheAsts codeDir subPath = do
         else regen
     else do
       hPutStrLn stderr "- Parsing (always)"
-      c <- readFile $ codeDir </> subPath
+      c <- readSrcFile $ codeDir </> subPath
       return $ case runParser parse () subPath c of
         Left err -> error $ show err
         Right ast -> ast

@@ -1,8 +1,9 @@
 module Main where
 
-import Lang.Php.Ast
 import System.Directory
 import System.FilePath
+
+import Lang.Php.Ast
 
 assertUnchanged :: String -> IO ()
 assertUnchanged s = do
@@ -17,12 +18,13 @@ assertUnchanged s = do
         "assertUnchanged:\n" ++ show s ++ "\n ->\n" ++
         show ast ++ "\n ->\n" ++ show s'
 
+testDir :: FilePath
 testDir = "src/Lang/Php/Ast/Test"
 
+main :: IO ()
 main = do
   assertUnchanged "<?php ''.'';"
   doesDirectoryExist testDir >>= \ e -> when e $
     mapM_ ((assertUnchanged =<<) . readFile . (testDir </>)) =<<
     filter ((/= '.') . head) <$> getDirectoryContents testDir
   putStrLn "all tests passed"
-
