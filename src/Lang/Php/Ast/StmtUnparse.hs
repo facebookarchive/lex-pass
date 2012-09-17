@@ -216,7 +216,7 @@ instance Unparse AnonFuncUse where
 instance Unparse AnonFunc where
   unparse (AnonFunc w1 ref (WSCap w2 args w3) use block) = concat [tokFunction,
     unparse w1, maybe [] ((tokAmp ++) . unparse) ref, unparse w2,
-    tokLParen, unparse args, tokRParen, unparse w3, unparse use, unparse block]
+    argListUnparser args, unparse w3, unparse use, unparse block]
 
 -- Stmt
 
