@@ -12,7 +12,7 @@ depends on
 
 to use
 - run `lex-pass` to see options
-- to see an example run, run `lex-pass example-glolbal` with a codebase in
+- to see an example run, run `lex-pass example-global` with a codebase in
   ~/www that uses some globals (e.g. "global $a;")
   - note a large codebase could takes tens of minutes the first run because no
     ast's are cached yet
