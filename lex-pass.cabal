@@ -1,59 +1,64 @@
-name:           lex-pass
-version:        2.0
-license:        BSD3
-license-file:   LICENSE
-author:         http://groups.google.com/group/lex-pass
-synopsis:       perform lexically-aware transformational passes over a
-                codebase, limiting number of files changed per run to try to
-                minimize conflicts in a rapidly changing development
-                environment
-build-type:     Simple
-cabal-version:  >= 1.6
+name:          lex-pass
+version:       2.0
+license:       BSD3
+license-file:  LICENSE
+author:        http://groups.google.com/group/lex-pass
+synopsis:
+    Lex-pass performs lexically-aware transformational passes over a
+    codebase. It also can limit the number of files changed per run
+    to minimize conflicts in a rapidly changing development
+    environment. Currently PHP is supported, with some extensions.
+build-type:    Simple
+cabal-version: >= 1.6
 
 flag test-only
-  description: Build test executable instead of main program
-  default:     False
+    description: Build test executable instead of main program
+    default:     False
 
 executable lex-pass
-  if flag(test-only)
-    buildable: False
-  hs-source-dirs: src
-  main-is:        Main.hs
-  build-depends:  base           >= 4 && < 5,
-                  binary,
-                  binary-generic,
-                  bytestring,
-                  containers,
-                  directory,
-                  filepath,
-                  FUtil,
-                  GenericPretty,
-                  HSH            >= 2 && < 3,
-                  MissingH,
-                  mtl,
-                  parsec         >= 3 && < 4,
-                  process,
-                  syb
-  ghc-options:    -threaded
+    if flag(test-only)
+        buildable: False
+    hs-source-dirs: src
+    main-is: Main.hs
+    build-depends:
+        base
+      , binary
+      , binary-generic
+      , bytestring
+      , containers
+      , directory
+      , filepath
+      , FUtil
+      , GenericPretty
+      , HSH
+      , MissingH
+      , mtl
+      , parsec
+      , process
+      , syb
+      , syb-with-class
+    ghc-options: -threaded
 
 executable lex-pass-test
-  if !flag(test-only)
-    buildable: False
-  hs-source-dirs: src
-  main-is:        Lang/Php/Ast/Test.hs
-  build-depends:  base           >= 4,
-                  binary,
-                  binary-generic,
-                  bytestring,
-                  containers,
-                  directory,
-                  filepath,
-                  FUtil,
-                  GenericPretty,
-                  HSH            >= 2 && < 3,
-                  mtl,
-                  parsec         >= 3 && < 4,
-                  process,
-                  syb
-  ghc-options:    -threaded
-
+    if !flag(test-only)
+        buildable: False
+    hs-source-dirs: src
+    main-is: Lang/Php/Ast/Test.hs
+    build-depends:
+        base
+      , binary
+      , binary-generic
+      , bytestring
+      , containers
+      , directory
+      , filepath
+      , FUtil
+      , GenericPretty
+      , HSH
+      , MissingH
+      , mtl
+      , parsec
+      , process
+      , syb
+      , syb-with-class
+    ghc-options: -threaded
