@@ -1,13 +1,13 @@
 module Lang.Php.Transf where
 
 import Control.Applicative
-import FUtil
 import Numeric
 
+import qualified Data.Intercal as IC
 import Lang.Php.Ast
 import Lang.Php.Ast.Stmt
 import LexPassUtil
-import qualified Data.Intercal as IC
+import Util
 
 -- ignores single-statement if/etc blocks currently
 -- (we _could_ convert them out of single-statement-ness on change)

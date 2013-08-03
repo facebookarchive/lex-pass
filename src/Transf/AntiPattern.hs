@@ -8,6 +8,7 @@ module Transf.AntiPattern where
 
 import Lang.Php
 import TransfUtil
+import Util
 import qualified Data.Intercal as IC
 
 transfs :: [Transf]

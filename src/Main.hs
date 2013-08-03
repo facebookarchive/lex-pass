@@ -5,7 +5,6 @@ import Control.Monad.Error
 import Data.Char
 import Data.List
 import Data.Maybe
-import FUtil
 import System.Console.GetOpt
 import System.Directory
 import System.Environment
@@ -14,10 +13,11 @@ import System.IO
 import System.Process
 
 import CodeGen.Transf
+import qualified Config
 import LexPassUtil
 import Options
 import TaskPool
-import qualified Config
+import Util
 
 endSpan :: (a -> Bool) -> [a] -> ([a], [a])
 endSpan p = uncurry (flip (,)) . bothond reverse . span p . reverse
@@ -47,7 +47,7 @@ usage err =
 showStRes :: CanErrStrIO (Bool, [String]) -> CanErrStrIO Bool
 showStRes f = do
   (ret, st) <- f
-  io . putStr $ unlines st
+  liftIO . putStr $ unlines st
   return ret
 
 lookupTrans :: String -> Transf

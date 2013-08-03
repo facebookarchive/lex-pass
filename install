@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
+
 echo 'Detecting transformers...'
-cd src
-./do-codegen
-cd ..
-cabal install --enable-optimization=2 --global --root-cmd=sudo
+(cd src; ./do-codegen)
+
+cabal install --enable-optimization=2 "$@"

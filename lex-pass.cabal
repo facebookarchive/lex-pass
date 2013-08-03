@@ -28,7 +28,6 @@ executable lex-pass
       , containers
       , directory
       , filepath
-      , FUtil
       , GenericPretty
       , HSH
       , MissingH
@@ -36,7 +35,6 @@ executable lex-pass
       , parsec
       , process
       , syb
-      , syb-with-class
     ghc-options: -threaded
 
 executable lex-pass-test
@@ -44,21 +42,3 @@ executable lex-pass-test
         buildable: False
     hs-source-dirs: src
     main-is: Lang/Php/Ast/Test.hs
-    build-depends:
-        base
-      , binary
-      , binary-generic
-      , bytestring
-      , containers
-      , directory
-      , filepath
-      , FUtil
-      , GenericPretty
-      , HSH
-      , MissingH
-      , mtl
-      , parsec
-      , process
-      , syb
-      , syb-with-class
-    ghc-options: -threaded

@@ -5,19 +5,20 @@ import Control.Applicative
 import Control.Arrow
 import Control.Monad.State
 import Data.Binary
+import qualified Data.ByteString.Char8 as BSC
 import Data.Data
 import Data.Generics
-import FUtil
 import HSH
-import Lang.Php.Ast
 import Options
 import System.Directory
 import System.FilePath
 import System.IO
 import System.Process
 import Text.Parsec.Prim (Parsec)
-import qualified Data.ByteString.Char8 as BSC
+
 import qualified Data.Intercal as IC
+import Lang.Php.Ast
+import Util
 
 --
 -- transf framework
@@ -70,17 +71,18 @@ argless f args dir subPath = if null args then f dir subPath
 lexPass :: (Binary a, Parse a, Unparse a) => (a -> Transformed a) ->
   Options -> FilePath -> FilePath -> Int -> Int -> CanErrStrIO (Bool, [String])
 lexPass transf opts codeDir subPath total cur = do
-  io . hPutStrLn stderr $ "Checking (" ++ show cur ++ "/" ++ show total ++
+  liftIO . hPutStrLn stderr $ "Checking (" ++ show cur ++ "/" ++ show total ++
     ") " ++ subPath
-  ast <- io $ parseAndCache (optCacheAsts opts) codeDir subPath
+  ast <- liftIO $ parseAndCache (optCacheAsts opts) codeDir subPath
   case transf ast of
     Transformed {infoLines = infoLines, transfResult = Nothing} ->
       return (False, infoLines)
-    Transformed {infoLines = infoLines, transfResult = Just ast'} -> io $ do
-      hPutStrLn stderr "- Saving"
-      writeSrcFile (codeDir </> subPath) $ unparse ast'
-      encodeFile (astPath codeDir subPath) ast'
-      return (True, infoLines)
+    Transformed {infoLines = infoLines, transfResult = Just ast'} ->
+      liftIO $ do
+        hPutStrLn stderr "- Saving"
+        writeSrcFile (codeDir </> subPath) $ unparse ast'
+        encodeFile (astPath codeDir subPath) ast'
+        return (True, infoLines)
 
 --
 -- basic transf-building tools
